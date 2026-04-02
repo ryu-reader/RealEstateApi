@@ -167,8 +167,31 @@ namespace RealEstateAPI.Controllers
         }
 
 
+        [HttpDelete("{id}")]
+        public async Task<ActionResult> Delete(int id)
+        {
+            try
+            {
+                var existingProperty = await _context.Properties.FindAsync(id);
+                if (existingProperty == null)
+                {
+                    return NotFound(new { message = $"Property with ID {id} not found." });
+                }
+                _context.Properties.Remove(existingProperty);
+                await _context.SaveChangesAsync();
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return Problem(
+                    detail: "An error occurred while deleting the property. Please try again later. " + ex.Message,
+                    statusCode: 500
+                );
+            }
+        }
 
 
 
-    }
+
+        }
 }
