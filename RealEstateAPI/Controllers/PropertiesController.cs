@@ -128,6 +128,44 @@ namespace RealEstateAPI.Controllers
             }
         }
 
+        [HttpPut("{id}")]
+        public async Task<ActionResult<Property>> Update(int id, [FromBody] PropertyUpdateDto property)
+        {
+            try
+            {
+                var existingProperty = await _context.Properties.FindAsync(id);
+                if (existingProperty == null)
+                {
+                    return NotFound(new { message = $"Property with ID {id} not found." });
+                }
+                existingProperty.Name = property.Name ?? existingProperty.Name;
+                existingProperty.Description = property.Description ?? existingProperty.Description;
+
+                if (property.Price != 0)
+                {
+                    existingProperty.Price = property.Price;
+                }
+
+                existingProperty.Currency = property.Currency ?? existingProperty.Currency;
+                existingProperty.Location = property.Location ?? existingProperty.Location;
+                existingProperty.City = property.City ?? existingProperty.City;
+                existingProperty.State = property.State ?? existingProperty.State;
+                existingProperty.Country = property.Country ?? existingProperty.Country;
+                existingProperty.Latitude = property.Latitude ?? existingProperty.Latitude;
+                existingProperty.Longitude = property.Longitude ?? existingProperty.Longitude;
+                if (property.Type != null) existingProperty.Type = property.Type.Value;
+                await _context.SaveChangesAsync();
+                return Ok(existingProperty);
+            }
+            catch (Exception ex)
+            {
+                return Problem(
+                    detail: "An error occurred while updating the property. Please try again later. " + ex.Message,
+                    statusCode: 500
+                );
+            }
+        }
+
 
 
 
