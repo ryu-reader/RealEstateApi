@@ -25,7 +25,7 @@ namespace RealEstateAPI.Controllers
             _jwt = jwt;
         }
 
-        [HttpGet("userinfo")]
+        [HttpGet("me")]
         [Authorize]
         public IActionResult GetUserInfo()
         {

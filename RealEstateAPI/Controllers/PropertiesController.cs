@@ -1,7 +1,10 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RealEstateAPI.Models;
+using RealEstateAPI.Security;
+using System.Security.Claims;
 
 namespace RealEstateAPI.Controllers
 {
@@ -12,11 +15,13 @@ namespace RealEstateAPI.Controllers
 
         private readonly ILogger<PropertiesController> _logger;
         private readonly ApplicationDbContext _context;
+        private readonly UserPermission _userPermission;
 
-        public PropertiesController(ILogger<PropertiesController> logger, ApplicationDbContext context)
+        public PropertiesController(ILogger<PropertiesController> logger, ApplicationDbContext context, UserPermission userPermission)
         {
             _logger = logger;
             _context = context;
+            _userPermission = userPermission;
         }
 
 
@@ -85,13 +90,31 @@ namespace RealEstateAPI.Controllers
 
 
         [HttpPost]
+        [Authorize]
         public async Task<ActionResult<Property>> Create([FromBody] PropertyAddDto property)
         {
             try
             {
 
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+      
 
-                if(property == null)
+                var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.ADD_PROPERTY);
+
+                if (!permission)
+                {
+                    return StatusCode(403, new { message = "You do not have permission to add properties." });
+                }
+
+
+                var existingProperty = await _context.Properties.FirstOrDefaultAsync(p => p.Code == property.Code);
+
+                if(existingProperty != null)
+                {
+                    return Conflict(new { message = $"A property with code '{property.Code}' already exists." });
+                }
+
+                if (property == null)
                 {
                     return BadRequest(new { message = "Property data is required." });
                 }
@@ -101,6 +124,7 @@ namespace RealEstateAPI.Controllers
                 var newProperty = new Property
                 {
                     Name = property.Name,
+                    Code = property.Code,
                     Description = property.Description,
                     Price = property.Price,
                     Currency = property.Currency,
@@ -129,16 +153,31 @@ namespace RealEstateAPI.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize]
         public async Task<ActionResult<Property>> Update(int id, [FromBody] PropertyUpdateDto property)
         {
             try
             {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+
+                var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.EDIT_PROPERTY);
+
+                if (!permission)
+                {
+                    return StatusCode(403, new { message = "You do not have permission to edit properties." });
+                }
+
+
                 var existingProperty = await _context.Properties.FindAsync(id);
                 if (existingProperty == null)
                 {
                     return NotFound(new { message = $"Property with ID {id} not found." });
                 }
                 existingProperty.Name = property.Name ?? existingProperty.Name;
+
+                existingProperty.Code = property.Code ?? existingProperty.Code;
+
                 existingProperty.Description = property.Description ?? existingProperty.Description;
 
                 if (property.Price != 0)
@@ -172,6 +211,17 @@ namespace RealEstateAPI.Controllers
         {
             try
             {
+
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+
+                var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.DELETE_PROPERTY);
+
+                if (!permission)
+                {
+                    return StatusCode(403, new { message = "You do not have permission to delete properties." });
+                }
+
                 var existingProperty = await _context.Properties.FindAsync(id);
                 if (existingProperty == null)
                 {

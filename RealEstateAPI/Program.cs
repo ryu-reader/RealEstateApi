@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using RealEstateAPI;
+using RealEstateAPI.Security;
 using System.Text;
 
 
@@ -14,6 +15,9 @@ builder.Services.AddSingleton(jwtSettings);
 
 // Registrar JwtService
 builder.Services.AddSingleton<JwtService>();
+
+// Registrar Services de seguridad y autorización
+builder.Services.AddScoped<UserPermission>();
 
 builder.Services.AddAuthentication(options =>
 {
@@ -46,6 +50,7 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+/*
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("JwtWithDb", policy =>
@@ -53,7 +58,7 @@ builder.Services.AddAuthorization(options =>
 });
 
 builder.Services.AddScoped<IAuthorizationHandler, JwtWithDbHandler>();
-
+*/
 
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
