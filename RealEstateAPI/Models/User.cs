@@ -1,5 +1,14 @@
 ﻿namespace RealEstateAPI.Models
 {
+
+    public class UserAddDTO
+    {
+        public string Name { get; set; } = String.Empty;
+        public string Email { get; set; } = String.Empty;
+        public string Password { get; set; } = String.Empty;
+
+    }
+
     public class User
     {
 
@@ -14,6 +23,8 @@
         public string Password { get; set; } = String.Empty;
 
         public string Image { get; set; } = String.Empty;
+
+        public Role Role { get; set; } = null!;
 
 
     }
