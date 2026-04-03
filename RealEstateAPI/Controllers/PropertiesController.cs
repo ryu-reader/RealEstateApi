@@ -196,7 +196,7 @@ namespace RealEstateAPI.Controllers
 
         [HttpPut("{id}")]
         [Authorize]
-        public async Task<ActionResult<Property>> Update(int id, [FromBody] PropertyUpdateDto property)
+        public async Task<ActionResult<Property>> Update(int id, [FromForm] PropertyUpdateDto property)
         {
             try
             {
@@ -235,6 +235,60 @@ namespace RealEstateAPI.Controllers
                 existingProperty.Latitude = property.Latitude ?? existingProperty.Latitude;
                 existingProperty.Longitude = property.Longitude ?? existingProperty.Longitude;
                 if (property.Type != null) existingProperty.Type = property.Type.Value;
+
+
+
+                //Update Image
+                if (property.Image != null && property.Image.Length > 0)
+                {
+                    // Obtener extensión del archivo original
+                    var extension = Path.GetExtension(property.Image.FileName);
+
+                    // Generar un nombre único usando GUID
+                    var randomFileName = $"{Guid.NewGuid()}{extension}";
+
+
+                    string folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", existingProperty.Id.ToString());
+                    string pathToExistingImage = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", existingProperty.Id.ToString(), existingProperty.Image ?? "");
+
+                    if (Directory.Exists(folderPath) && System.IO.File.Exists(pathToExistingImage) && !String.IsNullOrEmpty(existingProperty.Image))
+                    {
+                        System.IO.File.Delete(pathToExistingImage);
+                    }
+
+                    if (!Directory.Exists(folderPath))
+                    {
+                        System.IO.Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", existingProperty.Id.ToString()));
+                    }
+
+                    // Ruta final
+                    var filePath = Path.Combine(
+                        Directory.GetCurrentDirectory(),
+                        "wwwroot",
+                        "images",
+                        "properties",
+                        existingProperty.Id.ToString(),
+                        randomFileName
+                    );
+
+                    // Guardar el archivo
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await property.Image.CopyToAsync(stream);
+                    }
+
+                    // Guardar el nombre en la base de datos
+
+                    var propertyToUpdate = await _context.Properties.FindAsync(existingProperty.Id);
+                    if (propertyToUpdate != null)
+                    {
+                        propertyToUpdate.Image = randomFileName;
+                        await _context.SaveChangesAsync();
+                    }
+                }
+
+
+
                 await _context.SaveChangesAsync();
                 return Ok(existingProperty);
             }
@@ -269,6 +323,15 @@ namespace RealEstateAPI.Controllers
                 {
                     return NotFound(new { message = $"Property with ID {id} not found." });
                 }
+
+                string folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", existingProperty.Id.ToString());
+
+                if (Directory.Exists(folderPath))
+                {
+                    Directory.Delete(folderPath, true);
+                }
+
+
                 _context.Properties.Remove(existingProperty);
                 await _context.SaveChangesAsync();
                 return NoContent();

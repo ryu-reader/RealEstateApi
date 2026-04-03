@@ -29,7 +29,7 @@
 
         public PropertyType? Type { get; set; } = null;
 
-        public IFormFile? Image { get; set; } // opcional
+        public IFormFile? Image { get; set; }
 
 
     }
@@ -59,6 +59,8 @@
         public string Longitude { get; set; } = null!;
 
         public PropertyType? Type { get; set; } = null;
+
+        public IFormFile? Image { get; set; }
 
     }
 
