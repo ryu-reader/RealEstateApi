@@ -1,6 +1,18 @@
 ﻿namespace RealEstateAPI.Models
 {
 
+    public class LoginDTO
+    {
+        public string UsernameOrEmail { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+
+    public class TokenRequest
+    {
+        public string AccessToken { get; set; }
+        public string RefreshToken { get; set; }
+    }
+
     public class UserAddDTO
     {
         public string Name { get; set; } = String.Empty;
@@ -33,6 +45,9 @@
         public string Image { get; set; } = String.Empty;
 
         public Role Role { get; set; } = null!;
+
+        public string? RefreshToken { get; set; }
+        public DateTime? RefreshTokenExpiryTime { get; set; }
 
 
     }
