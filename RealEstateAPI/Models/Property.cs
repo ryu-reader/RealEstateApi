@@ -29,6 +29,9 @@
 
         public PropertyType? Type { get; set; } = null;
 
+        public IFormFile? Image { get; set; } // opcional
+
+
     }
 
     public class PropertyUpdateDto
@@ -107,7 +110,7 @@
 
         public PropertyType? Type { get; set; } = null;
 
-        public string? Image = null;
+        public string? Image { get; set; } = null;
 
 
     }

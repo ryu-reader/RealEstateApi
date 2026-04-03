@@ -91,7 +91,7 @@ namespace RealEstateAPI.Controllers
 
         [HttpPost]
         [Authorize]
-        public async Task<ActionResult<Property>> Create([FromBody] PropertyAddDto property)
+        public async Task<ActionResult<Property>> Create([FromForm] PropertyAddDto property)
         {
             try
             {
@@ -137,8 +137,50 @@ namespace RealEstateAPI.Controllers
                     Type = property.Type
                 };
 
+                
+
                 _context.Properties.Add(newProperty);
                 await _context.SaveChangesAsync();
+
+
+                if (property.Image != null && property.Image.Length > 0)
+                {
+                    // Obtener extensión del archivo original
+                    var extension = Path.GetExtension(property.Image.FileName);
+
+                    // Generar un nombre único usando GUID
+                    var randomFileName = $"{Guid.NewGuid()}{extension}";
+
+                    System.IO.Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", newProperty.Id.ToString()));
+
+                    // Ruta final
+                    var filePath = Path.Combine(
+                        Directory.GetCurrentDirectory(),
+                        "wwwroot",
+                        "images",
+                        "properties",
+                        newProperty.Id.ToString(),
+                        randomFileName
+                    );
+
+                    // Guardar el archivo
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await property.Image.CopyToAsync(stream);
+                    }
+
+                    // Guardar el nombre en la base de datos
+
+                    var propertyToUpdate = await _context.Properties.FindAsync(newProperty.Id);
+                    if (propertyToUpdate != null)
+                    {
+                        propertyToUpdate.Image = randomFileName;
+                        await _context.SaveChangesAsync();
+                    }
+                }
+
+                
+
                 return CreatedAtAction(nameof(GetById), new { id = newProperty.Id }, newProperty);
 
 
