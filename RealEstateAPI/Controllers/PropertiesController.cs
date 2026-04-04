@@ -437,6 +437,48 @@ namespace RealEstateAPI.Controllers
         }
 
 
+        
+        public async Task<ActionResult<Property>> DeleteImage(int id, int imageIndex)
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.EDIT_PROPERTY);
+                if (!permission)
+                {
+                    return StatusCode(403, new { message = "You do not have permission to edit properties." });
+                }
+                var existingProperty = await _context.Properties
+                    .FindAsync(id);
+                if (existingProperty == null)
+                {
+                    return NotFound(new { message = $"Property with ID {id} not found." });
+                }
+                if (imageIndex < 0 || imageIndex >= existingProperty.Images.Count)
+                {
+                    return BadRequest(new { message = "Invalid image index." });
+                }
+                var imageToDelete = existingProperty.Images[imageIndex];
+                string pathToExistingImage = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", existingProperty.Id.ToString(), imageToDelete);
+                if (System.IO.File.Exists(pathToExistingImage))
+                {
+                    System.IO.File.Delete(pathToExistingImage);
+                }
+                existingProperty.Images.RemoveAt(imageIndex);
+                _context.SaveChanges();
+                var updatedProperty = await _context.Properties.FindAsync(id);
+                return Ok(updatedProperty);
+            }
+            catch (Exception ex)
+            {
+                return Problem(
+                    detail: "An error occurred while deleting the property image. Please try again later. " + ex.Message,
+                    statusCode: 500
+                );
+            }
+        }
+
+
         [HttpDelete("{id}")]
         [Authorize]
         public async Task<ActionResult> Delete(int id)
