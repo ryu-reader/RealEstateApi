@@ -3,9 +3,13 @@
 
     public enum PermissionType
     {
-        ADD_PROPERTY,
-        EDIT_PROPERTY,
-        DELETE_PROPERTY,
+        ADD_PROPERTY = 0,
+        EDIT_PROPERTY = 1,
+        DELETE_PROPERTY = 2,
+        VIEW_ROLES = 3,
+        ADD_ROLE = 4,
+        EDIT_ROLE = 5,
+        DELETE_ROLE = 6,
     }
 
     public class Permission

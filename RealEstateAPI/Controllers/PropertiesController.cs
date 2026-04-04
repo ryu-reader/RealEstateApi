@@ -388,6 +388,7 @@ namespace RealEstateAPI.Controllers
 
         [HttpPost]
         [Route("update-images-position/{id}")]
+        [Authorize]
         public async Task<ActionResult<Property>> UpdatePositionImages(int id, int oldIndex, int newIndex)
         {
             try
@@ -437,7 +438,9 @@ namespace RealEstateAPI.Controllers
         }
 
 
-        
+        [HttpDelete]
+        [Route("delete-image/{id}/{imageIndex}")]
+        [Authorize]
         public async Task<ActionResult<Property>> DeleteImage(int id, int imageIndex)
         {
             try

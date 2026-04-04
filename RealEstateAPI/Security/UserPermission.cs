@@ -33,6 +33,17 @@ namespace RealEstateAPI.Security
                     .Any();
         }
 
+        public bool VerifiedRoleLevel(int userId, int requiredRoleLevel)
+        {
+            var user = _context.Users
+                        .Include(u => u.Role)
+                        .FirstOrDefault(u => u.Id == userId);
+            if (user == null) return false;
+            var Role = _context.Roles.Find(user.Role.Id);
+            if (Role == null) return false;
+            return Role.Level >= requiredRoleLevel;
+        }
+
 
 
     }
