@@ -307,7 +307,7 @@ namespace RealEstateAPI.Controllers
 
         [HttpPut]
         [Route("update-images/{id}")]
-        
+        [Authorize]
         public async Task<ActionResult<Property>> UpdateImages(int id, [FromForm] List<IFormFile>  Images)
         {
             try
@@ -318,7 +318,7 @@ namespace RealEstateAPI.Controllers
 
                 if (!permission)
                 {
-                    //return StatusCode(403, new { message = "You do not have permission to edit properties." });
+                    return StatusCode(403, new { message = "You do not have permission to edit properties." });
                 }
 
                 var existingProperty = await _context.Properties
@@ -371,7 +371,6 @@ namespace RealEstateAPI.Controllers
 
                 existingProperty.Images.AddRange(ImagesList);
                 _context.SaveChanges();
-                
 
                 var updatedProperty = await _context.Properties.FindAsync(id);
 
@@ -387,8 +386,59 @@ namespace RealEstateAPI.Controllers
             }
         }
 
+        [HttpPost]
+        [Route("update-images-position/{id}")]
+        public async Task<ActionResult<Property>> UpdatePositionImages(int id, int oldIndex, int newIndex)
+        {
+            try
+            {
 
-            [HttpDelete("{id}")]
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.EDIT_PROPERTY);
+
+                if (!permission)
+                {
+                    return StatusCode(403, new { message = "You do not have permission to edit properties." });
+                }
+
+
+                if (oldIndex == newIndex)
+                {
+                    return BadRequest(new { message = "Old index and new index cannot be the same." });
+                }
+
+                
+
+                var existingProperty = await _context.Properties
+                    .FindAsync(id);
+                if (existingProperty == null)
+                {
+                    return NotFound(new { message = $"Property with ID {id} not found." });
+                }
+                if (oldIndex < 0 || oldIndex >= existingProperty.Images.Count || newIndex < 0 || newIndex >= existingProperty.Images.Count)
+                {
+                    return BadRequest(new { message = "Invalid image indices." });
+                }
+                var imageToMove = existingProperty.Images[oldIndex];
+                existingProperty.Images.RemoveAt(oldIndex);
+                existingProperty.Images.Insert(newIndex, imageToMove);
+                _context.SaveChanges();
+                var updatedProperty = await _context.Properties.FindAsync(id);
+                return Ok(updatedProperty);
+            }
+            catch (Exception ex)
+            {
+                return Problem(
+                    detail: "An error occurred while updating the property images. Please try again later. " + ex.Message,
+                    statusCode: 500
+                );
+            }
+        }
+
+
+        [HttpDelete("{id}")]
+        [Authorize]
         public async Task<ActionResult> Delete(int id)
         {
             try

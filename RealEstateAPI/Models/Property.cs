@@ -120,7 +120,7 @@
 
         public string? Image { get; set; } = null;
 
-        public List<string>? Images { get; set; } = new();
+        public List<string> Images { get; set; } = new();
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
