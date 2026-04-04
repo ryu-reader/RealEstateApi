@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using RealEstateAPI;
 
@@ -11,9 +12,11 @@ using RealEstateAPI;
 namespace RealEstateAPI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260403090040_ImagesPropertyFixNameToImages")]
+    partial class ImagesPropertyFixNameToImages
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -99,9 +102,6 @@ namespace RealEstateAPI.Migrations
                     b.Property<string>("Image")
                         .HasColumnType("longtext");
 
-                    b.PrimitiveCollection<string>("Images")
-                        .HasColumnType("longtext");
-
                     b.Property<string>("Latitude")
                         .IsRequired()
                         .HasColumnType("longtext");
@@ -131,6 +131,28 @@ namespace RealEstateAPI.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Properties");
+                });
+
+            modelBuilder.Entity("RealEstateAPI.Models.PropertyImage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.PrimitiveCollection<string>("Images")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("PropertyId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PropertyId");
+
+                    b.ToTable("PropertyImages");
                 });
 
             modelBuilder.Entity("RealEstateAPI.Models.Role", b =>
@@ -218,6 +240,17 @@ namespace RealEstateAPI.Migrations
                     b.Navigation("Permission");
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("RealEstateAPI.Models.PropertyImage", b =>
+                {
+                    b.HasOne("RealEstateAPI.Models.Property", "Property")
+                        .WithMany()
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Property");
                 });
 
             modelBuilder.Entity("RealEstateAPI.Models.User", b =>

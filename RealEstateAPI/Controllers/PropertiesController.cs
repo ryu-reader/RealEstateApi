@@ -50,10 +50,14 @@ namespace RealEstateAPI.Controllers
                     query = query.Where(p => p.Type == (PropertyType)Type);
                 }
 
+
                 var properties = await query
                     .Skip((Page - 1) * pageSize)
                     .Take(pageSize)
                     .ToListAsync();
+
+                
+
 
 
                 return properties;
@@ -301,8 +305,90 @@ namespace RealEstateAPI.Controllers
             }
         }
 
+        [HttpPut]
+        [Route("update-images/{id}")]
+        
+        public async Task<ActionResult<Property>> UpdateImages(int id, [FromForm] List<IFormFile>  Images)
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-        [HttpDelete("{id}")]
+                var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.EDIT_PROPERTY);
+
+                if (!permission)
+                {
+                    //return StatusCode(403, new { message = "You do not have permission to edit properties." });
+                }
+
+                var existingProperty = await _context.Properties
+                    .FindAsync(id);
+
+                if(existingProperty == null)
+                {
+                    return NotFound(new { message = $"Property with ID {id} not found." });
+                }
+
+                List<string> ImagesList = new List<string>();
+
+                foreach (var image in Images)
+                {
+
+                    // Obtener extensión del archivo original
+                    var extension = Path.GetExtension(image.FileName);
+
+                    // Generar un nombre único usando GUID
+                    var randomFileName = $"{Guid.NewGuid()}{extension}";
+
+                    string folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", existingProperty.Id.ToString());
+
+                    if (!Directory.Exists(folderPath))
+                    {
+                        System.IO.Directory.CreateDirectory(folderPath);
+                    }
+
+
+                    // Ruta final
+                    var filePath = Path.Combine(
+                        Directory.GetCurrentDirectory(),
+                        "wwwroot",
+                        "images",
+                        "properties",
+                        existingProperty.Id.ToString(),
+                        randomFileName
+                    );
+
+                    // Guardar el archivo
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await image.CopyToAsync(stream);
+                    }
+
+                    ImagesList.Add(randomFileName);
+
+                }
+
+
+                existingProperty.Images.AddRange(ImagesList);
+                _context.SaveChanges();
+                
+
+                var updatedProperty = await _context.Properties.FindAsync(id);
+
+                return Ok(updatedProperty);
+
+            }
+            catch (Exception ex)
+            {
+                return Problem(
+                    detail: "An error occurred while updating the property images. Please try again later. " + ex.Message,
+                    statusCode: 500
+                );
+            }
+        }
+
+
+            [HttpDelete("{id}")]
         public async Task<ActionResult> Delete(int id)
         {
             try

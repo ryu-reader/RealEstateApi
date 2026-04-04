@@ -82,6 +82,12 @@
         Land
     }
 
+    public class PropertyFull
+    {
+        public Property Property { get; set; } = null!;
+
+        public List<string> Images { get; set; } = null!;
+    }
 
     public class Property
     {
@@ -113,6 +119,10 @@
         public PropertyType? Type { get; set; } = null;
 
         public string? Image { get; set; } = null;
+
+        public List<string>? Images { get; set; } = new();
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
 
     }
