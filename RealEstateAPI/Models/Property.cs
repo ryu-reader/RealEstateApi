@@ -173,7 +173,7 @@
 
         public DateTime? UpdatedAt { get; set; } = null;
 
-        public User? CreatedBy { get; set; } = null;
+        public User CreatedBy { get; set; } = null!;
 
         public PropertyStatus Status { get; set; } = PropertyStatus.Available;
 

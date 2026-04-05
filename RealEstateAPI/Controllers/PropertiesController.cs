@@ -181,6 +181,11 @@ namespace RealEstateAPI.Controllers
 
                 var CreatedByUser = await _context.Users.FindAsync(Convert.ToInt32(userId));
 
+                if(CreatedByUser == null)
+                {
+                    return StatusCode(403, new { message = "User not found." });
+                }
+
                 var newProperty = new Property
                 {
                     Name = property.Name,
@@ -415,7 +420,10 @@ namespace RealEstateAPI.Controllers
                     .Include(p => p.CreatedBy)
                     .FirstOrDefaultAsync(p => p.Id == existingProperty.Id);
 
-                    var PropertyGet = new PropertyGet
+
+                if(updatedProperty == null) return NotFound(new { message = $"Property with ID {existingProperty.Id} not found after update." });
+
+                var PropertyGet = new PropertyGet
                     {
                         Id = updatedProperty.Id,
                         Name = updatedProperty.Name,
