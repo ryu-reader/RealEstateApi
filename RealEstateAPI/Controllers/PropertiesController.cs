@@ -26,7 +26,7 @@ namespace RealEstateAPI.Controllers
 
 
         [HttpGet]
-        public async Task<ActionResult<List<Property>>> Get(int Page = 1, string Code = "", int Type = -1)
+        public async Task<ActionResult<List<PropertyGet>>> Get(int Page = 1, string Code = "", int Type = -1)
         {
             
 
@@ -54,6 +54,27 @@ namespace RealEstateAPI.Controllers
                 var properties = await query
                     .Skip((Page - 1) * pageSize)
                     .Take(pageSize)
+                    .Select(p => new PropertyGet
+                    {
+                        Id = p.Id,
+                        Name = p.Name,
+                        Code = p.Code,
+                        Description = p.Description,
+                        Price = p.Price,
+                        Currency = p.Currency,
+                        Location = p.Location,
+                        City = p.City,
+                        State = p.State,
+                        Country = p.Country,
+                        Latitude = p.Latitude,
+                        Longitude = p.Longitude,
+                        Type = p.Type,
+                        Image = p.Image,
+                        Images = p.Images,
+                        Created = p.CreatedBy != null ? p.CreatedBy.Id : 0,
+                        CreatedAt = p.CreatedAt,
+                        UpdatedAt = p.UpdatedAt
+                    })
                     .ToListAsync();
 
                 
@@ -72,7 +93,7 @@ namespace RealEstateAPI.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Property>> GetById(int id)
+        public async Task<ActionResult<PropertyGet>> GetById(int id)
         {
             try
             {
@@ -81,7 +102,39 @@ namespace RealEstateAPI.Controllers
                 {
                     return NotFound(new { message = $"Property with ID {id} not found." });
                 }
-                return property;
+
+                var PropertyWithCreator = await _context.Properties
+                    .Include(p => p.CreatedBy)
+                    .ThenInclude(u => u.Role)
+                    .FirstOrDefaultAsync(p => p.Id == id);
+
+
+                if(PropertyWithCreator == null) return NotFound(new { message = $"Property with ID {id} not found." });
+
+                var PropertyGet = new PropertyGet
+                {
+                    Id = PropertyWithCreator.Id,
+                    Name = PropertyWithCreator.Name,
+                    Code = PropertyWithCreator.Code,
+                    Description = PropertyWithCreator.Description,
+                    Price = PropertyWithCreator.Price,
+                    Currency = PropertyWithCreator.Currency,
+                    Location = PropertyWithCreator.Location,
+                    City = PropertyWithCreator.City,
+                    State = PropertyWithCreator.State,
+                    Country = PropertyWithCreator.Country,
+                    Latitude = PropertyWithCreator.Latitude,
+                    Longitude = PropertyWithCreator.Longitude,
+                    Type = PropertyWithCreator.Type,
+                    Image = PropertyWithCreator.Image,
+                    Images = PropertyWithCreator.Images,
+                    Created = PropertyWithCreator.CreatedBy != null ? PropertyWithCreator.CreatedBy.Id : 0,
+                    CreatedAt = PropertyWithCreator.CreatedAt,
+                    UpdatedAt = PropertyWithCreator.UpdatedAt
+                };
+
+
+                return PropertyGet;
             }
             catch (Exception ex)
             {
@@ -95,12 +148,13 @@ namespace RealEstateAPI.Controllers
 
         [HttpPost]
         [Authorize]
-        public async Task<ActionResult<Property>> Create([FromForm] PropertyAddDto property)
+        public async Task<ActionResult<PropertyGet>> Create([FromForm] PropertyAddDto property)
         {
             try
             {
 
                 var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
       
 
                 var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.ADD_PROPERTY);
@@ -125,6 +179,8 @@ namespace RealEstateAPI.Controllers
 
                 if(property.Type == null) property.Type = PropertyType.House;
 
+                var CreatedByUser = await _context.Users.FindAsync(Convert.ToInt32(userId));
+
                 var newProperty = new Property
                 {
                     Name = property.Name,
@@ -138,7 +194,8 @@ namespace RealEstateAPI.Controllers
                     Country = property.Country,
                     Latitude = property.Latitude,
                     Longitude = property.Longitude,
-                    Type = property.Type
+                    Type = property.Type,
+                    CreatedBy = CreatedByUser,
                 };
 
                 
@@ -183,9 +240,39 @@ namespace RealEstateAPI.Controllers
                     }
                 }
 
-                
+                var readProperty = await _context.Properties
+                    .Include(p => p.CreatedBy)
+                    .FirstOrDefaultAsync(p => p.Id == newProperty.Id);
 
-                return CreatedAtAction(nameof(GetById), new { id = newProperty.Id }, newProperty);
+
+                if( readProperty == null)
+                {
+                    return NotFound(new { message = $"Property with ID {newProperty.Id} not found after creation." });
+                }
+
+                var PropertyGet = new PropertyGet
+                {
+                    Id = readProperty.Id,
+                    Name = readProperty.Name,
+                    Code = readProperty.Code,
+                    Description = readProperty.Description,
+                    Price = readProperty.Price,
+                    Currency = readProperty.Currency,
+                    Location = readProperty.Location,
+                    City = readProperty.City,
+                    State = readProperty.State,
+                    Country = readProperty.Country,
+                    Latitude = readProperty.Latitude,
+                    Longitude = readProperty.Longitude,
+                    Type = readProperty.Type,
+                    Image = readProperty.Image,
+                    Images = readProperty.Images,
+                    Created = readProperty.CreatedBy != null ? readProperty.CreatedBy.Id : 0,
+                    CreatedAt = readProperty.CreatedAt,
+                    UpdatedAt = readProperty.UpdatedAt
+                };
+
+                return CreatedAtAction(nameof(GetById), new { id = PropertyGet.Id }, PropertyGet);
 
 
             }
@@ -200,7 +287,7 @@ namespace RealEstateAPI.Controllers
 
         [HttpPut("{id}")]
         [Authorize]
-        public async Task<ActionResult<Property>> Update(int id, [FromForm] PropertyUpdateDto property)
+        public async Task<ActionResult<PropertyGet>> Update(int id, [FromForm] PropertyUpdateDto property)
         {
             try
             {
@@ -220,6 +307,38 @@ namespace RealEstateAPI.Controllers
                 {
                     return NotFound(new { message = $"Property with ID {id} not found." });
                 }
+
+
+                //Extra Verification to avoid duplicate code when updating
+                var existingPropertyWithSameCode = await _context.Properties.FirstOrDefaultAsync(p => p.Code == property.Code && p.Id != id);
+                if (existingPropertyWithSameCode != null)
+                {
+                    return Conflict(new { message = $"A property with code '{property.Code}' already exists." });
+                }
+
+                var HasCreated = _context.Properties.
+                    Include(p => p.CreatedBy)
+                    .ThenInclude(u => u.Role)
+                    .FirstOrDefault(p => p.Id == id);
+
+
+                var MyUser = await _context.Users.FindAsync(Convert.ToInt32(userId));
+
+                if(MyUser == null)
+                {
+                    return StatusCode(403, new { message = "User not found." });
+                }
+
+                bool CanEdit = HasCreated != null && HasCreated.CreatedBy != null && HasCreated.CreatedBy.Id != Convert.ToInt32(userId) && !_userPermission.VerifiedRoleLevel(MyUser.Id, HasCreated.CreatedBy.Role.Level);
+
+
+                if (CanEdit)
+                {
+                    return StatusCode(403, new { message = "You can`t edit this property" });
+                }
+
+
+
                 existingProperty.Name = property.Name ?? existingProperty.Name;
 
                 existingProperty.Code = property.Code ?? existingProperty.Code;
@@ -238,6 +357,7 @@ namespace RealEstateAPI.Controllers
                 existingProperty.Country = property.Country ?? existingProperty.Country;
                 existingProperty.Latitude = property.Latitude ?? existingProperty.Latitude;
                 existingProperty.Longitude = property.Longitude ?? existingProperty.Longitude;
+                existingProperty.UpdatedAt = DateTime.UtcNow;
                 if (property.Type != null) existingProperty.Type = property.Type.Value;
 
 
@@ -291,10 +411,37 @@ namespace RealEstateAPI.Controllers
                     }
                 }
 
+                var updatedProperty = await _context.Properties
+                    .Include(p => p.CreatedBy)
+                    .FirstOrDefaultAsync(p => p.Id == existingProperty.Id);
+
+                    var PropertyGet = new PropertyGet
+                    {
+                        Id = updatedProperty.Id,
+                        Name = updatedProperty.Name,
+                        Code = updatedProperty.Code,
+                        Description = updatedProperty.Description,
+                        Price = updatedProperty.Price,
+                        Currency = updatedProperty.Currency,
+                        Location = updatedProperty.Location,
+                        City = updatedProperty.City,
+                        State = updatedProperty.State,
+                        Country = updatedProperty.Country,
+                        Latitude = updatedProperty.Latitude,
+                        Longitude = updatedProperty.Longitude,
+                        Type = updatedProperty.Type,
+                        Image = updatedProperty.Image,
+                        Images = updatedProperty.Images,
+                        Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
+                        CreatedAt = updatedProperty.CreatedAt,
+                        UpdatedAt = updatedProperty.UpdatedAt
+                    };
+
+
 
 
                 await _context.SaveChangesAsync();
-                return Ok(existingProperty);
+                return Ok(PropertyGet);
             }
             catch (Exception ex)
             {
@@ -308,7 +455,7 @@ namespace RealEstateAPI.Controllers
         [HttpPut]
         [Route("update-images/{id}")]
         [Authorize]
-        public async Task<ActionResult<Property>> UpdateImages(int id, [FromForm] List<IFormFile>  Images)
+        public async Task<ActionResult<PropertyGet>> UpdateImages(int id, [FromForm] List<IFormFile>  Images)
         {
             try
             {
@@ -374,7 +521,35 @@ namespace RealEstateAPI.Controllers
 
                 var updatedProperty = await _context.Properties.FindAsync(id);
 
-                return Ok(updatedProperty);
+                if(updatedProperty == null)
+                {
+                    return NotFound(new { message = $"Property with ID {id} not found after updating images." });
+                }
+
+                var PropertyGet = new PropertyGet
+                {
+                    Id = updatedProperty.Id,
+                    Name = updatedProperty.Name,
+                    Code = updatedProperty.Code,
+                    Description = updatedProperty.Description,
+                    Price = updatedProperty.Price,
+                    Currency = updatedProperty.Currency,
+                    Location = updatedProperty.Location,
+                    City = updatedProperty.City,
+                    State = updatedProperty.State,
+                    Country = updatedProperty.Country,
+                    Latitude = updatedProperty.Latitude,
+                    Longitude = updatedProperty.Longitude,
+                    Type = updatedProperty.Type,
+                    Image = updatedProperty.Image,
+                    Images = updatedProperty.Images,
+                    Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
+                    CreatedAt = updatedProperty.CreatedAt,
+                    UpdatedAt = updatedProperty.UpdatedAt
+                };
+
+
+                return Ok(PropertyGet);
 
             }
             catch (Exception ex)
@@ -389,7 +564,7 @@ namespace RealEstateAPI.Controllers
         [HttpPost]
         [Route("update-images-position/{id}")]
         [Authorize]
-        public async Task<ActionResult<Property>> UpdatePositionImages(int id, int oldIndex, int newIndex)
+        public async Task<ActionResult<PropertyGet>> UpdatePositionImages(int id, int oldIndex, int newIndex)
         {
             try
             {
@@ -426,7 +601,34 @@ namespace RealEstateAPI.Controllers
                 existingProperty.Images.Insert(newIndex, imageToMove);
                 _context.SaveChanges();
                 var updatedProperty = await _context.Properties.FindAsync(id);
-                return Ok(updatedProperty);
+
+                if(updatedProperty == null) return NotFound(new { message = $"Property with ID {id} not found after updating images." });
+
+
+                var PropertyGet = new PropertyGet
+                {
+                    Id = updatedProperty.Id,
+                    Name = updatedProperty.Name,
+                    Code = updatedProperty.Code,
+                    Description = updatedProperty.Description,
+                    Price = updatedProperty.Price,
+                    Currency = updatedProperty.Currency,
+                    Location = updatedProperty.Location,
+                    City = updatedProperty.City,
+                    State = updatedProperty.State,
+                    Country = updatedProperty.Country,
+                    Latitude = updatedProperty.Latitude,
+                    Longitude = updatedProperty.Longitude,
+                    Type = updatedProperty.Type,
+                    Image = updatedProperty.Image,
+                    Images = updatedProperty.Images,
+                    Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
+                    CreatedAt = updatedProperty.CreatedAt,
+                    UpdatedAt = updatedProperty.UpdatedAt
+                };
+
+
+                return Ok(PropertyGet);
             }
             catch (Exception ex)
             {
@@ -441,7 +643,7 @@ namespace RealEstateAPI.Controllers
         [HttpDelete]
         [Route("delete-image/{id}/{imageIndex}")]
         [Authorize]
-        public async Task<ActionResult<Property>> DeleteImage(int id, int imageIndex)
+        public async Task<ActionResult<PropertyGet>> DeleteImage(int id, int imageIndex)
         {
             try
             {
@@ -470,7 +672,33 @@ namespace RealEstateAPI.Controllers
                 existingProperty.Images.RemoveAt(imageIndex);
                 _context.SaveChanges();
                 var updatedProperty = await _context.Properties.FindAsync(id);
-                return Ok(updatedProperty);
+
+                if(updatedProperty == null) return NotFound(new { message = $"Property with ID {id} not found after deleting image." });
+
+                var PropertyGet = new PropertyGet
+                {
+                    Id = updatedProperty.Id,
+                    Name = updatedProperty.Name,
+                    Code = updatedProperty.Code,
+                    Description = updatedProperty.Description,
+                    Price = updatedProperty.Price,
+                    Currency = updatedProperty.Currency,
+                    Location = updatedProperty.Location,
+                    City = updatedProperty.City,
+                    State = updatedProperty.State,
+                    Country = updatedProperty.Country,
+                    Latitude = updatedProperty.Latitude,
+                    Longitude = updatedProperty.Longitude,
+                    Type = updatedProperty.Type,
+                    Image = updatedProperty.Image,
+                    Images = updatedProperty.Images,
+                    Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
+                    CreatedAt = updatedProperty.CreatedAt,
+                    UpdatedAt = updatedProperty.UpdatedAt
+                };
+
+
+                return Ok(PropertyGet);
             }
             catch (Exception ex)
             {

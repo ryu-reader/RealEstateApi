@@ -49,6 +49,7 @@
         public string? RefreshToken { get; set; }
         public DateTime? RefreshTokenExpiryTime { get; set; }
 
+        public List<FidoCredential> Credentials { get; set; } = new();
 
     }
 }

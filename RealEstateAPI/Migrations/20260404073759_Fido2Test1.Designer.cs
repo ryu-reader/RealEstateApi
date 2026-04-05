@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using RealEstateAPI;
 
@@ -11,9 +12,11 @@ using RealEstateAPI;
 namespace RealEstateAPI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260404073759_Fido2Test1")]
+    partial class Fido2Test1
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -55,7 +58,7 @@ namespace RealEstateAPI.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("FidoCredential");
+                    b.ToTable("FidoCredentials");
                 });
 
             modelBuilder.Entity("RealEstateAPI.Models.Permission", b =>
@@ -164,9 +167,6 @@ namespace RealEstateAPI.Migrations
                     b.Property<string>("State")
                         .IsRequired()
                         .HasColumnType("longtext");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
 
                     b.Property<int?>("Type")
                         .HasColumnType("int");

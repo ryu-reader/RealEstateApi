@@ -1,10 +1,14 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using Fido2NetLib;
+using Fido2NetLib.Objects;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 using RealEstateAPI.Models;
 using System.Runtime;
 using System.Security.Claims;
+using System.Text;
 
 namespace RealEstateAPI.Controllers
 {
@@ -16,6 +20,7 @@ namespace RealEstateAPI.Controllers
         private readonly JwtService _jwt;
         private readonly ApplicationDbContext _context;
         private readonly ILogger<AuthController> _logger;
+        private readonly IFido2 _fido2;
 
 
         public AuthController(ApplicationDbContext context, ILogger<AuthController> logger, JwtService jwt)
@@ -95,7 +100,7 @@ namespace RealEstateAPI.Controllers
 
 
         [HttpPost("register")]
-        public async Task<ActionResult<User>> Register([FromForm] UserAddDTO dTO)
+        public async Task<ActionResult<Models.User>> Register([FromForm] UserAddDTO dTO)
         {
 
             try
@@ -145,7 +150,7 @@ namespace RealEstateAPI.Controllers
 
 
 
-                User user = new User
+                Models.User user = new Models.User
                 {
                     Name = dTO.Name,
                     Email = dTO.Email,
@@ -241,7 +246,7 @@ namespace RealEstateAPI.Controllers
             return Ok(new { accessToken = newAccessToken, refreshToken = newRefreshToken });
         }
 
-
+        
 
 
 

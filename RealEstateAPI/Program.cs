@@ -50,6 +50,13 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+builder.Services.AddFido2(options =>
+{
+    options.ServerDomain = "https://localhost:7011";
+    options.ServerName = "RealEstate";
+    options.Origins = new HashSet<string> { "https://localhost:7011" };
+});
+
 /*
 builder.Services.AddAuthorization(options =>
 {
