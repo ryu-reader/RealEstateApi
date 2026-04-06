@@ -27,7 +27,7 @@
 
         public string Longitude { get; set; } = null!;
 
-        public PropertyType? Type { get; set; } = null;
+        public PropertyType Type { get; set; }
 
         public IFormFile? Image { get; set; }
 
@@ -61,6 +61,8 @@
         public PropertyType? Type { get; set; } = null;
 
         public IFormFile? Image { get; set; }
+
+        public PropertyStatus Status { get; set; }
 
     }
 
@@ -134,6 +136,8 @@
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public DateTime? UpdatedAt { get; set; } = null;
+
+        public PropertyStatus Status { get; set; }
     }
 
     public class Property

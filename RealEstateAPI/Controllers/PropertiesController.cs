@@ -16,17 +16,19 @@ namespace RealEstateAPI.Controllers
         private readonly ILogger<PropertiesController> _logger;
         private readonly ApplicationDbContext _context;
         private readonly UserPermission _userPermission;
+        private readonly IWebHostEnvironment _env;
 
-        public PropertiesController(ILogger<PropertiesController> logger, ApplicationDbContext context, UserPermission userPermission)
+        public PropertiesController(ILogger<PropertiesController> logger, ApplicationDbContext context, UserPermission userPermission, IWebHostEnvironment env)
         {
             _logger = logger;
             _context = context;
             _userPermission = userPermission;
+            _env = env;
         }
 
 
         [HttpGet]
-        public async Task<ActionResult<List<PropertyGet>>> Get(int Page = 1, string Code = "", int Type = -1)
+        public async Task<ActionResult<List<PropertyGet>>> Get(int Page = 1, string Code = "", PropertyType Type = PropertyType.Apartment, PropertyStatus Status = PropertyStatus.Available)
         {
             
 
@@ -45,9 +47,14 @@ namespace RealEstateAPI.Controllers
                 }
 
 
-                if (Type != -1 && Enum.IsDefined(typeof(PropertyType), Type))
+                if (Enum.IsDefined(typeof(PropertyType), Type))
                 {
                     query = query.Where(p => p.Type == (PropertyType)Type);
+                }
+
+                if (Enum.IsDefined(typeof(PropertyStatus), Status))
+                {
+                    query = query.Where(p => p.Status == (PropertyStatus)Status);
                 }
 
 
@@ -177,7 +184,7 @@ namespace RealEstateAPI.Controllers
                     return BadRequest(new { message = "Property data is required." });
                 }
 
-                if(property.Type == null) property.Type = PropertyType.House;
+               
 
                 var CreatedByUser = await _context.Users.FindAsync(Convert.ToInt32(userId));
 
@@ -201,6 +208,7 @@ namespace RealEstateAPI.Controllers
                     Longitude = property.Longitude,
                     Type = property.Type,
                     CreatedBy = CreatedByUser,
+                    Status = PropertyStatus.Available
                 };
 
                 
@@ -363,6 +371,10 @@ namespace RealEstateAPI.Controllers
                 existingProperty.Latitude = property.Latitude ?? existingProperty.Latitude;
                 existingProperty.Longitude = property.Longitude ?? existingProperty.Longitude;
                 existingProperty.UpdatedAt = DateTime.UtcNow;
+
+                existingProperty.Status = property.Status;
+
+
                 if (property.Type != null) existingProperty.Type = property.Type.Value;
 
 
@@ -442,8 +454,9 @@ namespace RealEstateAPI.Controllers
                         Images = updatedProperty.Images,
                         Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
                         CreatedAt = updatedProperty.CreatedAt,
-                        UpdatedAt = updatedProperty.UpdatedAt
-                    };
+                        UpdatedAt = updatedProperty.UpdatedAt,
+                        Status = updatedProperty.Status
+                };
 
 
 
@@ -553,7 +566,8 @@ namespace RealEstateAPI.Controllers
                     Images = updatedProperty.Images,
                     Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
                     CreatedAt = updatedProperty.CreatedAt,
-                    UpdatedAt = updatedProperty.UpdatedAt
+                    UpdatedAt = updatedProperty.UpdatedAt,
+                    Status = updatedProperty.Status
                 };
 
 
@@ -632,7 +646,8 @@ namespace RealEstateAPI.Controllers
                     Images = updatedProperty.Images,
                     Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
                     CreatedAt = updatedProperty.CreatedAt,
-                    UpdatedAt = updatedProperty.UpdatedAt
+                    UpdatedAt = updatedProperty.UpdatedAt,
+                    Status = updatedProperty.Status
                 };
 
 
@@ -702,7 +717,9 @@ namespace RealEstateAPI.Controllers
                     Images = updatedProperty.Images,
                     Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
                     CreatedAt = updatedProperty.CreatedAt,
-                    UpdatedAt = updatedProperty.UpdatedAt
+                    UpdatedAt = updatedProperty.UpdatedAt,
+                    Status = updatedProperty.Status
+                
                 };
 
 
@@ -762,9 +779,34 @@ namespace RealEstateAPI.Controllers
             }
         }
 
+        [HttpGet]
+        [Route("view-image/{id}/{filename}")]
+        public IActionResult ViewImage(int id, string filename)
+        {
+            var ruta = Path.Combine(_env.WebRootPath, "images", "properties", id.ToString(), filename);
+            if (!System.IO.File.Exists(ruta))
+            {
+                return NotFound(new { message = $"Image '{filename}' for property with ID {id} not found." });
+            }
+            var imageBytes = System.IO.File.ReadAllBytes(ruta);
+            var contentType = GetContentTypeImage(ruta);
+            return File(imageBytes, contentType);
+        }
 
-
-
-
+        // Agrega este método privado en la clase PropertiesController para solucionar CS0103
+        private string GetContentTypeImage(string path)
+        {
+            var ext = Path.GetExtension(path).ToLowerInvariant();
+            return ext switch
+            {
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                ".gif" => "image/gif",
+                ".bmp" => "image/bmp",
+                ".webp" => "image/webp",
+                ".svg" => "image/svg+xml",
+                _ => "application/octet-stream"
+            };
+        }
     }
 }
