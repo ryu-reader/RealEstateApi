@@ -1,4 +1,6 @@
-﻿namespace RealEstateAPI.Models
+﻿using System.ComponentModel.DataAnnotations.Schema;
+
+namespace RealEstateAPI.Models
 {
 
 
@@ -138,6 +140,9 @@
         public DateTime? UpdatedAt { get; set; } = null;
 
         public PropertyStatus Status { get; set; }
+
+        public List<PropertyFeatureResponseDto> Features { get; set; } = new();
+
     }
 
     public class Property
@@ -181,6 +186,7 @@
 
         public PropertyStatus Status { get; set; } = PropertyStatus.Available;
 
+        public List<PropertyFeature> PropertyFeatures { get; set; } = new();
 
     }
 }

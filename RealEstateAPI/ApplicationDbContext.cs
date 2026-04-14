@@ -12,6 +12,10 @@ namespace RealEstateAPI
 
         public DbSet<Property> Properties { get; set; }
 
+        public DbSet<Feature> Features { get; set; }
+
+        public DbSet<PropertyFeature> PropertyFeatures { get; set; }
+
         public DbSet<AgentFeedback> AgentFeedbacks { get; set; }
 
         //public DbSet<PropertyImage> PropertyImages { get; set; }

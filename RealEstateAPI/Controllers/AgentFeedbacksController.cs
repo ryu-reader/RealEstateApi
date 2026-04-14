@@ -101,6 +101,11 @@ namespace RealEstateAPI.Controllers
                     return BadRequest("Feedback already exists from this user and IP address");
                 }
 
+                if(agentFeedbackDTO.StarRating < 0 || agentFeedbackDTO.StarRating > 5)
+                {
+                    return BadRequest("Star rating must be between 0 and 5");
+                }
+
 
                 var agentFeedback = new AgentFeedback
                 {
@@ -148,6 +153,7 @@ namespace RealEstateAPI.Controllers
             {
 
                 var IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+
                 if (string.IsNullOrEmpty(IpAddress))
                 {
                     return BadRequest("Unable to determine IP address");
@@ -158,6 +164,12 @@ namespace RealEstateAPI.Controllers
                 {
                     return NotFound("Feedback not found");
                 }
+
+                if(agentFeedbackDTO.StarRating < 0 || agentFeedbackDTO.StarRating > 5)
+                {
+                    return BadRequest("Star rating must be between 0 and 5");
+                }
+
                 existingFeedback.Feedback = agentFeedbackDTO.Feedback;
                 existingFeedback.UserName = agentFeedbackDTO.UserName;
                 existingFeedback.UserEmail = agentFeedbackDTO.UserEmail;

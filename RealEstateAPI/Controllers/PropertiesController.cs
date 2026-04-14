@@ -80,7 +80,13 @@ namespace RealEstateAPI.Controllers
                         Images = p.Images,
                         Created = p.CreatedBy != null ? p.CreatedBy.Id : 0,
                         CreatedAt = p.CreatedAt,
-                        UpdatedAt = p.UpdatedAt
+                        UpdatedAt = p.UpdatedAt,
+                        Features = p.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
+                        {
+                            Feature = f.Feature,
+                            Value = f.Value
+                        }).ToList()
+
                     })
                     .ToListAsync();
 

@@ -57,7 +57,7 @@ namespace RealEstateAPI.Controllers
                         .FirstOrDefaultAsync(u => u.Username == dto.UsernameOrEmail || u.Email == dto.UsernameOrEmail);
 
             if (user == null)
-                return Unauthorized("Invalid username or password.");
+                return Unauthorized("Invalid username or email.");
 
             // Verificar contraseña con BCrypt
             if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.Password))
