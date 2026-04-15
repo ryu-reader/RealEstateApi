@@ -10,6 +10,9 @@
         ADD_ROLE = 4,
         EDIT_ROLE = 5,
         DELETE_ROLE = 6,
+        ADD_FEATURE = 7,
+        EDIT_FEATURE = 8,
+        DELETE_FEATURE = 9
     }
 
     public class Permission

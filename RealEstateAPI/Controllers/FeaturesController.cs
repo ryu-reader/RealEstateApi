@@ -1,7 +1,10 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RealEstateAPI.Models;
+using RealEstateAPI.Security;
+using System.Security.Claims;
 
 namespace RealEstateAPI.Controllers
 {
@@ -13,11 +16,13 @@ namespace RealEstateAPI.Controllers
 
         private readonly ApplicationDbContext _context;
         private readonly ILogger<FeaturesController> _logger;
+        private readonly UserPermission _userPermission;
 
-        public FeaturesController(ApplicationDbContext context, ILogger<FeaturesController> logger)
+        public FeaturesController(ApplicationDbContext context, ILogger<FeaturesController> logger, UserPermission userPermission)
         {
             _context = context;
             _logger = logger;
+            _userPermission = userPermission;
         }
 
         [HttpGet]
@@ -53,10 +58,19 @@ namespace RealEstateAPI.Controllers
         }
 
         [HttpPost]
+        [Authorize]
         public async Task<ActionResult<Feature>> PostFeature([FromForm] FeatureAddDto featureDto)
         {
             try
             {
+
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if(!_userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.ADD_FEATURE))
+                {
+                    return Forbid("You do not have permission to create a feature.");
+                }
+
 
                 var existingFeature = await _context.Features.FirstOrDefaultAsync(f => f.Name == featureDto.Name);
 
@@ -194,6 +208,8 @@ namespace RealEstateAPI.Controllers
                 var propertyFeatures = _context.PropertyFeatures.Where(pf => pf.Feature.Id == id);
                 _context.PropertyFeatures.RemoveRange(propertyFeatures);
 
+
+
                 _context.Features.Remove(feature);
                 await _context.SaveChangesAsync();
                 return NoContent();
@@ -204,8 +220,48 @@ namespace RealEstateAPI.Controllers
             }
         }
 
-
-
-
+        [HttpGet("view-image/{id}")]
+        public async Task<IActionResult> ViewImage(int id)
+        {
+            try
+            {
+                var feature = await _context.Features.FindAsync(id);
+                if (feature == null || string.IsNullOrEmpty(feature.Icon))
+                {
+                    return NotFound();
+                }
+                var filePath = Path.Combine(
+                    Directory.GetCurrentDirectory(),
+                    "wwwroot",
+                    "images",
+                    "features",
+                    feature.Icon
+                );
+                if (!System.IO.File.Exists(filePath))
+                {
+                    return NotFound();
+                }
+                var imageBytes = await System.IO.File.ReadAllBytesAsync(filePath);
+                var contentType = GetContentType(filePath);
+                return File(imageBytes, contentType);
+            }
+            catch (Exception ex)
+            {
+                return Problem(ex.Message);
+            }
         }
+
+        private string GetContentType(string filePath)
+        {
+            // Simple mapping based on file extension
+            var extension = Path.GetExtension(filePath).ToLower();
+            return extension switch
+            {
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                ".gif" => "image/gif",
+                _ => "application/octet-stream",
+            };
+        }
+    }
 }

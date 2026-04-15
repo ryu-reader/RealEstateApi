@@ -41,11 +41,10 @@ namespace RealEstateAPI.Controllers
 
                 var query = _context.Properties.AsQueryable();
 
-                if (!string.IsNullOrEmpty(Code))
-                {
-                    query = query.Where(p => p.Code.Contains(Code));
-                }
+                if (!string.IsNullOrEmpty(Code)) query = query.Where(p => p.Code.Contains(Code));
+                
 
+                
 
                 if (Enum.IsDefined(typeof(PropertyType), Type))
                 {
@@ -75,12 +74,17 @@ namespace RealEstateAPI.Controllers
                         Country = p.Country,
                         Latitude = p.Latitude,
                         Longitude = p.Longitude,
+                        Bathrooms = p.Bathrooms,
+                        Bedrooms = p.Bedrooms,
+                        SQFT = p.SQFT,
+                        ParkingSpaces = p.ParkingSpaces,
                         Type = p.Type,
                         Image = p.Image,
                         Images = p.Images,
                         Created = p.CreatedBy != null ? p.CreatedBy.Id : 0,
                         CreatedAt = p.CreatedAt,
                         UpdatedAt = p.UpdatedAt,
+                        Status = p.Status,
                         Features = p.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
                         {
                             Feature = f.Feature,
@@ -137,13 +141,23 @@ namespace RealEstateAPI.Controllers
                     State = PropertyWithCreator.State,
                     Country = PropertyWithCreator.Country,
                     Latitude = PropertyWithCreator.Latitude,
-                    Longitude = PropertyWithCreator.Longitude,
+                    Longitude = PropertyWithCreator.Longitude
+                    ,Bathrooms = PropertyWithCreator.Bathrooms,
+                    Bedrooms = PropertyWithCreator.Bedrooms,
+                    SQFT = PropertyWithCreator.SQFT,
+                    ParkingSpaces = PropertyWithCreator.ParkingSpaces,
                     Type = PropertyWithCreator.Type,
                     Image = PropertyWithCreator.Image,
                     Images = PropertyWithCreator.Images,
                     Created = PropertyWithCreator.CreatedBy != null ? PropertyWithCreator.CreatedBy.Id : 0,
                     CreatedAt = PropertyWithCreator.CreatedAt,
-                    UpdatedAt = PropertyWithCreator.UpdatedAt
+                    UpdatedAt = PropertyWithCreator.UpdatedAt,
+                    Status = PropertyWithCreator.Status,
+                    Features = PropertyWithCreator.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
+                    {
+                        Feature = f.Feature,
+                        Value = f.Value
+                    }).ToList()
                 };
 
 
@@ -204,6 +218,10 @@ namespace RealEstateAPI.Controllers
                     Name = property.Name,
                     Code = property.Code,
                     Description = property.Description,
+                    Bathrooms = property.Bathrooms,
+                    Bedrooms = property.Bedrooms,
+                    ParkingSpaces = property.ParkingSpaces,
+                    SQFT = property.SQFT,
                     Price = property.Price,
                     Currency = property.Currency,
                     Location = property.Location,
@@ -214,6 +232,7 @@ namespace RealEstateAPI.Controllers
                     Longitude = property.Longitude,
                     Type = property.Type,
                     CreatedBy = CreatedByUser,
+                    
                     Status = PropertyStatus.Available
                 };
 
@@ -283,12 +302,23 @@ namespace RealEstateAPI.Controllers
                     Country = readProperty.Country,
                     Latitude = readProperty.Latitude,
                     Longitude = readProperty.Longitude,
+                    Bathrooms = readProperty.Bathrooms,
+                    Bedrooms = readProperty.Bedrooms,
+                    SQFT = readProperty.SQFT,
+                    ParkingSpaces = readProperty.ParkingSpaces,
+                    Status = readProperty.Status,
                     Type = readProperty.Type,
                     Image = readProperty.Image,
                     Images = readProperty.Images,
                     Created = readProperty.CreatedBy != null ? readProperty.CreatedBy.Id : 0,
                     CreatedAt = readProperty.CreatedAt,
-                    UpdatedAt = readProperty.UpdatedAt
+                    UpdatedAt = readProperty.UpdatedAt,
+                    
+                    Features = readProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
+                    {
+                        Feature = f.Feature,
+                        Value = f.Value
+                    }).ToList()
                 };
 
                 return CreatedAtAction(nameof(GetById), new { id = PropertyGet.Id }, PropertyGet);
@@ -377,6 +407,11 @@ namespace RealEstateAPI.Controllers
                 existingProperty.Latitude = property.Latitude ?? existingProperty.Latitude;
                 existingProperty.Longitude = property.Longitude ?? existingProperty.Longitude;
                 existingProperty.UpdatedAt = DateTime.UtcNow;
+                existingProperty .Bathrooms = property.Bathrooms != 0 ? property.Bathrooms : existingProperty.Bathrooms;
+                existingProperty.Bedrooms = property.Bedrooms != 0 ? property.Bedrooms : existingProperty.Bedrooms;
+                existingProperty.SQFT = property.SQFT ?? existingProperty.SQFT;
+                existingProperty.ParkingSpaces = property.ParkingSpaces != 0 ? property.ParkingSpaces : existingProperty.ParkingSpaces;
+
 
                 existingProperty.Status = property.Status;
 
@@ -455,13 +490,22 @@ namespace RealEstateAPI.Controllers
                         Country = updatedProperty.Country,
                         Latitude = updatedProperty.Latitude,
                         Longitude = updatedProperty.Longitude,
+                        Bathrooms = updatedProperty.Bathrooms,
+                        Bedrooms = updatedProperty.Bedrooms,
+                        SQFT = updatedProperty.SQFT,
+                        ParkingSpaces = updatedProperty.ParkingSpaces,
                         Type = updatedProperty.Type,
                         Image = updatedProperty.Image,
                         Images = updatedProperty.Images,
                         Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
                         CreatedAt = updatedProperty.CreatedAt,
                         UpdatedAt = updatedProperty.UpdatedAt,
-                        Status = updatedProperty.Status
+                        Status = updatedProperty.Status,
+                        Features = updatedProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
+                        {
+                            Feature = f.Feature,
+                            Value = f.Value
+                        }).ToList()
                 };
 
 
@@ -567,13 +611,22 @@ namespace RealEstateAPI.Controllers
                     Country = updatedProperty.Country,
                     Latitude = updatedProperty.Latitude,
                     Longitude = updatedProperty.Longitude,
+                    Bathrooms = updatedProperty.Bathrooms,
+                    Bedrooms = updatedProperty.Bedrooms,
+                    SQFT = updatedProperty.SQFT,
+                    ParkingSpaces = updatedProperty.ParkingSpaces,
                     Type = updatedProperty.Type,
                     Image = updatedProperty.Image,
                     Images = updatedProperty.Images,
                     Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
                     CreatedAt = updatedProperty.CreatedAt,
                     UpdatedAt = updatedProperty.UpdatedAt,
-                    Status = updatedProperty.Status
+                    Status = updatedProperty.Status,
+                    Features = updatedProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
+                    {
+                        Feature = f.Feature,
+                        Value = f.Value
+                    }).ToList()
                 };
 
 
@@ -647,13 +700,22 @@ namespace RealEstateAPI.Controllers
                     Country = updatedProperty.Country,
                     Latitude = updatedProperty.Latitude,
                     Longitude = updatedProperty.Longitude,
+                    Bathrooms = updatedProperty.Bathrooms,
+                    Bedrooms = updatedProperty.Bedrooms,
+                    SQFT = updatedProperty.SQFT,
+                    ParkingSpaces = updatedProperty.ParkingSpaces,
                     Type = updatedProperty.Type,
                     Image = updatedProperty.Image,
                     Images = updatedProperty.Images,
                     Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
                     CreatedAt = updatedProperty.CreatedAt,
                     UpdatedAt = updatedProperty.UpdatedAt,
-                    Status = updatedProperty.Status
+                    Status = updatedProperty.Status,
+                    Features = updatedProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
+                    {
+                        Feature = f.Feature,
+                        Value = f.Value
+                    }).ToList()
                 };
 
 
@@ -718,14 +780,23 @@ namespace RealEstateAPI.Controllers
                     Country = updatedProperty.Country,
                     Latitude = updatedProperty.Latitude,
                     Longitude = updatedProperty.Longitude,
+                    Bathrooms = updatedProperty.Bathrooms,
+                    Bedrooms = updatedProperty.Bedrooms,
+                    SQFT = updatedProperty.SQFT,
+                    ParkingSpaces = updatedProperty.ParkingSpaces,
                     Type = updatedProperty.Type,
                     Image = updatedProperty.Image,
                     Images = updatedProperty.Images,
                     Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
                     CreatedAt = updatedProperty.CreatedAt,
                     UpdatedAt = updatedProperty.UpdatedAt,
-                    Status = updatedProperty.Status
-                
+                    Status = updatedProperty.Status,
+                    Features = updatedProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
+                    {
+                        Feature = f.Feature,
+                        Value = f.Value
+                    }).ToList()
+
                 };
 
 

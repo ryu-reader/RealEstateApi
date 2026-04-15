@@ -17,8 +17,6 @@ namespace RealEstateAPI
         public DbSet<PropertyFeature> PropertyFeatures { get; set; }
 
         public DbSet<AgentFeedback> AgentFeedbacks { get; set; }
-
-        //public DbSet<PropertyImage> PropertyImages { get; set; }
         public DbSet<User> Users { get; set; }
 
         //public DbSet<FidoCredential> FidoCredentials { get; set; }

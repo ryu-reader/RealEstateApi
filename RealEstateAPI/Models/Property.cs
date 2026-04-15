@@ -10,6 +10,14 @@ namespace RealEstateAPI.Models
 
         public string Code { get; set; } = String.Empty;
 
+        public int Bathrooms { get; set; }
+
+        public int Bedrooms { get; set; }
+
+        public int ParkingSpaces { get; set; } = 0;
+
+        public string SQFT { get; set; } = null!;
+
 
         public string Description { get; set; } = null!;
 
@@ -59,6 +67,14 @@ namespace RealEstateAPI.Models
         public string Latitude { get; set; } = null!;
 
         public string Longitude { get; set; } = null!;
+
+        public int Bathrooms { get; set; }
+
+        public int Bedrooms { get; set; }
+
+        public string SQFT { get; set; } = null!;
+
+        public int ParkingSpaces { get; set; } = 0;
 
         public PropertyType? Type { get; set; } = null;
 
@@ -127,6 +143,14 @@ namespace RealEstateAPI.Models
 
         public string Longitude { get; set; } = null!;
 
+        public int Bathrooms { get; set; }
+
+        public int Bedrooms { get; set; }
+
+        public string SQFT { get; set; } = null!;
+
+        public int ParkingSpaces { get; set; } = 0;
+
         public PropertyType? Type { get; set; } = null;
 
         public string? Image { get; set; } = null;
@@ -171,6 +195,14 @@ namespace RealEstateAPI.Models
         public string Latitude { get; set; } = null!;
 
         public string Longitude { get; set; } = null!;
+
+        public int Bathrooms { get; set; }
+
+        public int Bedrooms { get; set; }
+
+        public string SQFT { get; set; } = null!;
+
+        public int ParkingSpaces { get; set; } = 0;
 
         public PropertyType? Type { get; set; } = null;
 
