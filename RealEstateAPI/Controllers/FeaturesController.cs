@@ -129,6 +129,14 @@ namespace RealEstateAPI.Controllers
         {
             try
             {
+
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if(!_userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.EDIT_FEATURE))
+                {
+                    return Forbid("You do not have permission to edit a feature.");
+                }
+
                 var feature = await _context.Features.FindAsync(id);
                 if (feature == null)
                 {
@@ -182,6 +190,13 @@ namespace RealEstateAPI.Controllers
         {
             try
             {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if(!_userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.DELETE_FEATURE))
+                {
+                    return Forbid("You do not have permission to delete a feature.");
+                }
+
                 var feature = await _context.Features.FindAsync(id);
                 if (feature == null)
                 {
