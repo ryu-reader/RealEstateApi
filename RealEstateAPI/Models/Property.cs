@@ -39,6 +39,8 @@ namespace RealEstateAPI.Models
 
         public PropertyType Type { get; set; }
 
+        public ListingType ListingType { get; set; }
+
         public IFormFile? Image { get; set; }
 
 
@@ -78,6 +80,8 @@ namespace RealEstateAPI.Models
 
         public PropertyType? Type { get; set; } = null;
 
+        public ListingType ListingType { get; set; }
+
         public IFormFile? Image { get; set; }
 
         public PropertyStatus Status { get; set; }
@@ -95,27 +99,20 @@ namespace RealEstateAPI.Models
 
     public enum PropertyType
     {
-        Apartment,
-        House,
-        Condo,
-        Townhouse,
-        Land
+        Apartment = 0,
+        House = 1,
+        Condo = 2,
+        Townhouse = 3,
+        Land = 4
     }
 
     public enum PropertyStatus
     {
-        Available,
-        Sold,
-        Pending
+        Available = 0,
+        Sold = 1,
+        Pending = 2
     }
 
-
-    public class PropertyFull
-    {
-        public Property Property { get; set; } = null!;
-
-        public List<string> Images { get; set; } = null!;
-    }
 
     public class PropertyGet
     {
@@ -152,6 +149,8 @@ namespace RealEstateAPI.Models
         public int ParkingSpaces { get; set; } = 0;
 
         public PropertyType? Type { get; set; } = null;
+
+        public ListingType ListingType { get; set; }
 
         public string? Image { get; set; } = null;
 
@@ -205,6 +204,8 @@ namespace RealEstateAPI.Models
         public int ParkingSpaces { get; set; } = 0;
 
         public PropertyType? Type { get; set; } = null;
+
+        public ListingType ListingType { get; set; }
 
         public string? Image { get; set; } = null;
 

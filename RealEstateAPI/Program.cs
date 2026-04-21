@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -9,6 +9,28 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:5173") 
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials(); 
+    });
+});
+
 // Configurar JwtSettings desde appsettings.json
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>();
 builder.Services.AddSingleton(jwtSettings);
@@ -16,7 +38,7 @@ builder.Services.AddSingleton(jwtSettings);
 // Registrar JwtService
 builder.Services.AddSingleton<JwtService>();
 
-// Registrar Services de seguridad y autorizaci�n
+// Registrar Services de seguridad y autorización
 builder.Services.AddScoped<UserPermission>();
 
 builder.Services.AddAuthentication(options =>
@@ -105,6 +127,7 @@ app.MapGet("/", () => "API Working!!");
 
 app.UseHttpsRedirection();
 
+app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
 app.UseAuthorization();

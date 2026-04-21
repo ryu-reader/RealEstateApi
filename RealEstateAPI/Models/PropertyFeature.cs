@@ -1,6 +1,13 @@
 ﻿namespace RealEstateAPI.Models
 {
 
+
+    public class PropertyFeatureAddDto
+    {
+        public int FeatureId { get; set; }
+        public string Value { get; set; } = null!;
+    }
+
     public class PropertyFeatureResponseDto
     {
         public Feature Feature { get; set; } = null!;

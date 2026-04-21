@@ -32,7 +32,7 @@ namespace RealEstateAPI.Controllers
 
         [HttpGet("me")]
         [Authorize]
-        public IActionResult GetUserInfo()
+        public async Task<ActionResult<Models.User>> GetUserInfo()
         {
             // Obtienes info del token
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -44,7 +44,21 @@ namespace RealEstateAPI.Controllers
                         .Select(u => u.Role.Name)
                         .FirstOrDefault();
 
-            return Ok(new { userId, username, role });
+            var MyUser = _context.Users
+                        .Include(u => u.Role)
+                        .Where(u => u.Id.ToString() == userId)
+                        .FirstOrDefault();
+
+            var Permissions = _context.Roles
+                        .Include(r => r.PermissionsRole)
+                        .Where(r => r.Name == role)
+                        .SelectMany(r => r.PermissionsRole.Select(p => p.Permission.Type))
+                        .ToList();
+
+            
+
+
+            return Ok(new { MyUser, Permissions});
         }
 
 
@@ -67,6 +81,14 @@ namespace RealEstateAPI.Controllers
             var accessToken = _jwt.GenerateAccessToken(user);
             var refreshToken = _jwt.GenerateRefreshToken();
 
+            //Get Permissions
+            var Permissions = _context.Roles
+                        .Include(r => r.PermissionsRole)
+                        .Where(r => r.Name == user.Role.Name)
+                        .SelectMany(r => r.PermissionsRole.Select(p => p.Permission.Type))
+                        .ToList();
+
+
             // Guardar refresh token en DB
             user.RefreshToken = refreshToken;
             user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
@@ -76,7 +98,7 @@ namespace RealEstateAPI.Controllers
             {
                 HttpOnly = true,
                 Secure = true,
-                SameSite = SameSiteMode.Strict,
+                SameSite = SameSiteMode.None,
                 Expires = DateTime.UtcNow.AddMinutes(15)
             });
 
@@ -84,7 +106,8 @@ namespace RealEstateAPI.Controllers
             {
                 HttpOnly = true,
                 Secure = true,
-                SameSite = SameSiteMode.Strict,
+                SameSite = SameSiteMode.None,
+                
                 Expires = DateTime.UtcNow.AddDays(7)
             });
 
@@ -92,13 +115,15 @@ namespace RealEstateAPI.Controllers
             {
                 accessToken,
                 refreshToken,
+                User = user,
+                Permissions,
                 username = user.Username,
                 role = user.Role.Name,
                 userId = user.Id
             });
         }
 
-
+        /*
         [HttpPost("register")]
         public async Task<ActionResult<Models.User>> Register([FromForm] UserAddDTO dTO)
         {
@@ -201,8 +226,40 @@ namespace RealEstateAPI.Controllers
 
             }
         }
+        */
 
-        
+
+        [HttpGet("logout")]
+        [Authorize]
+        public async Task<IActionResult> Logout()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id.ToString() == userId);
+            if (user == null)
+                return Unauthorized();
+            user.RefreshToken = null;
+            user.RefreshTokenExpiryTime = null;
+            await _context.SaveChangesAsync();
+
+            Response.Cookies.Delete("access_token", new CookieOptions
+            {
+                Path = "/",
+                SameSite = SameSiteMode.None,
+                Secure = true
+            });
+
+            Response.Cookies.Delete("refresh_token", new CookieOptions
+            {
+                Path = "/",
+                SameSite = SameSiteMode.None,
+                Secure = true
+            });
+
+
+            return Ok("Logged out successfully.");
+        }
+
+
         [HttpPost("refresh")]
         [Authorize]
         public async Task<IActionResult> Refresh()
@@ -231,7 +288,7 @@ namespace RealEstateAPI.Controllers
             {
                 HttpOnly = true,
                 Secure = true,
-                SameSite = SameSiteMode.Strict,
+                SameSite = SameSiteMode.None,
                 Expires = DateTime.UtcNow.AddMinutes(15)
             });
 
@@ -239,8 +296,8 @@ namespace RealEstateAPI.Controllers
             {
                 HttpOnly = true,
                 Secure = true,
-                SameSite = SameSiteMode.Strict,
-                Expires = DateTime.UtcNow.AddDays(7)
+                SameSite = SameSiteMode.None,
+                Expires = DateTime.UtcNow.AddDays(1)
             });
 
             return Ok(new { accessToken = newAccessToken, refreshToken = newRefreshToken });

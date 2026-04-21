@@ -28,7 +28,11 @@ namespace RealEstateAPI.Controllers
 
 
         [HttpGet]
-        public async Task<ActionResult<List<PropertyGet>>> Get(int Page = 1, string Code = "", PropertyType Type = PropertyType.Apartment, PropertyStatus Status = PropertyStatus.Available)
+        public async Task<ActionResult<List<PropertyGet>>> Get(int Page = 1,
+            string? Name = null,
+            string? Code = null,
+            ListingType? listingType = null,
+            PropertyType? Type = null, PropertyStatus? Status = null)
         {
             
 
@@ -36,22 +40,22 @@ namespace RealEstateAPI.Controllers
             {
 
                 //pagination
-                int pageSize = 10;
+                int pageSize = 50;
 
 
                 var query = _context.Properties.AsQueryable();
 
+                if (!string.IsNullOrEmpty(Name)) query = query.Where(p => p.Name.Contains(Name));
+
                 if (!string.IsNullOrEmpty(Code)) query = query.Where(p => p.Code.Contains(Code));
-                
 
-                
 
-                if (Enum.IsDefined(typeof(PropertyType), Type))
+                if (Type != null && Enum.IsDefined(typeof(PropertyType), Type))
                 {
                     query = query.Where(p => p.Type == (PropertyType)Type);
                 }
 
-                if (Enum.IsDefined(typeof(PropertyStatus), Status))
+                if (Status != null && Enum.IsDefined(typeof(PropertyStatus), Status))
                 {
                     query = query.Where(p => p.Status == (PropertyStatus)Status);
                 }
@@ -78,6 +82,8 @@ namespace RealEstateAPI.Controllers
                         Bedrooms = p.Bedrooms,
                         SQFT = p.SQFT,
                         ParkingSpaces = p.ParkingSpaces,
+                        
+                        ListingType = p.ListingType,
                         Type = p.Type,
                         Image = p.Image,
                         Images = p.Images,
@@ -114,7 +120,9 @@ namespace RealEstateAPI.Controllers
         {
             try
             {
-                var property = await _context.Properties.FindAsync(id);
+                var property = await _context.Properties.Include(p => p.PropertyFeatures)
+                    .ThenInclude(e => e.Feature)
+                    .FirstOrDefaultAsync(p => p.Id == id);
                 if (property == null)
                 {
                     return NotFound(new { message = $"Property with ID {id} not found." });
@@ -147,6 +155,7 @@ namespace RealEstateAPI.Controllers
                     SQFT = PropertyWithCreator.SQFT,
                     ParkingSpaces = PropertyWithCreator.ParkingSpaces,
                     Type = PropertyWithCreator.Type,
+                    ListingType = PropertyWithCreator.ListingType,
                     Image = PropertyWithCreator.Image,
                     Images = PropertyWithCreator.Images,
                     Created = PropertyWithCreator.CreatedBy != null ? PropertyWithCreator.CreatedBy.Id : 0,
@@ -232,7 +241,7 @@ namespace RealEstateAPI.Controllers
                     Longitude = property.Longitude,
                     Type = property.Type,
                     CreatedBy = CreatedByUser,
-                    
+                    ListingType = property.ListingType,
                     Status = PropertyStatus.Available
                 };
 
@@ -306,6 +315,7 @@ namespace RealEstateAPI.Controllers
                     Bedrooms = readProperty.Bedrooms,
                     SQFT = readProperty.SQFT,
                     ParkingSpaces = readProperty.ParkingSpaces,
+                    ListingType = readProperty.ListingType,
                     Status = readProperty.Status,
                     Type = readProperty.Type,
                     Image = readProperty.Image,
@@ -411,7 +421,7 @@ namespace RealEstateAPI.Controllers
                 existingProperty.Bedrooms = property.Bedrooms != 0 ? property.Bedrooms : existingProperty.Bedrooms;
                 existingProperty.SQFT = property.SQFT ?? existingProperty.SQFT;
                 existingProperty.ParkingSpaces = property.ParkingSpaces != 0 ? property.ParkingSpaces : existingProperty.ParkingSpaces;
-
+                existingProperty.ListingType = property.ListingType ;
 
                 existingProperty.Status = property.Status;
 
@@ -494,6 +504,7 @@ namespace RealEstateAPI.Controllers
                         Bedrooms = updatedProperty.Bedrooms,
                         SQFT = updatedProperty.SQFT,
                         ParkingSpaces = updatedProperty.ParkingSpaces,
+                        ListingType = updatedProperty.ListingType,
                         Type = updatedProperty.Type,
                         Image = updatedProperty.Image,
                         Images = updatedProperty.Images,
@@ -547,6 +558,29 @@ namespace RealEstateAPI.Controllers
                     return NotFound(new { message = $"Property with ID {id} not found." });
                 }
 
+                string folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", existingProperty.Id.ToString());
+
+                if (!Directory.Exists(folderPath))
+                {
+                    System.IO.Directory.CreateDirectory(folderPath);
+                }
+
+
+                foreach (var item in existingProperty.Images)
+                {
+                    //Delete Image
+                    string pathToExistingImage = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", existingProperty.Id.ToString(), item);
+                    if (System.IO.File.Exists(pathToExistingImage))
+                    {
+                        System.IO.File.Delete(pathToExistingImage);
+                    }
+                }
+
+
+                existingProperty.Images.Clear();
+                _context.SaveChanges();
+                
+
                 List<string> ImagesList = new List<string>();
 
                 foreach (var image in Images)
@@ -558,12 +592,8 @@ namespace RealEstateAPI.Controllers
                     // Generar un nombre único usando GUID
                     var randomFileName = $"{Guid.NewGuid()}{extension}";
 
-                    string folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", existingProperty.Id.ToString());
 
-                    if (!Directory.Exists(folderPath))
-                    {
-                        System.IO.Directory.CreateDirectory(folderPath);
-                    }
+                   
 
 
                     // Ruta final
@@ -614,6 +644,7 @@ namespace RealEstateAPI.Controllers
                     Bathrooms = updatedProperty.Bathrooms,
                     Bedrooms = updatedProperty.Bedrooms,
                     SQFT = updatedProperty.SQFT,
+                    ListingType = updatedProperty.ListingType,
                     ParkingSpaces = updatedProperty.ParkingSpaces,
                     Type = updatedProperty.Type,
                     Image = updatedProperty.Image,
@@ -704,6 +735,7 @@ namespace RealEstateAPI.Controllers
                     Bedrooms = updatedProperty.Bedrooms,
                     SQFT = updatedProperty.SQFT,
                     ParkingSpaces = updatedProperty.ParkingSpaces,
+                    ListingType = updatedProperty.ListingType,
                     Type = updatedProperty.Type,
                     Image = updatedProperty.Image,
                     Images = updatedProperty.Images,
@@ -725,6 +757,111 @@ namespace RealEstateAPI.Controllers
             {
                 return Problem(
                     detail: "An error occurred while updating the property images. Please try again later. " + ex.Message,
+                    statusCode: 500
+                );
+            }
+        }
+
+        [HttpPost]
+        [Route("update-features/{id}")]
+        [Authorize]
+        public async Task<ActionResult<PropertyGet>> UpdateFeatures(int id, [FromBody] List<PropertyFeatureAddDto> features)
+        {
+            try
+            {
+
+               
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.EDIT_PROPERTY);
+                if (!permission)
+                {
+                    return StatusCode(403, new { message = "You do not have permission to edit properties." });
+                }
+
+                var idExistingProperty = await _context.Properties
+                    .Include(p => p.PropertyFeatures)
+                    .FirstOrDefaultAsync(p => p.Id == id);
+
+                if (idExistingProperty == null)
+                    {
+                    return NotFound(new { message = $"Property with ID {id} not found." });
+                }
+
+                // Remove existing features
+                _context.PropertyFeatures.RemoveRange(idExistingProperty.PropertyFeatures);
+
+
+                
+
+                foreach (var featureDto in features)
+                {
+
+                    var feature = _context.Features.Find(featureDto.FeatureId);
+
+                    if (feature == null) continue;
+
+                    PropertyFeature propertyFeature = new PropertyFeature
+                    {
+                        Property = idExistingProperty,
+                        Feature = feature,
+                        Value = featureDto.Value,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    _context.PropertyFeatures.Add(propertyFeature);
+
+
+                }
+
+                await _context.SaveChangesAsync();
+
+                var updatedProperty = await _context.Properties
+                    .Include(p => p.CreatedBy)
+                    .FirstOrDefaultAsync(p => p.Id == id);
+
+                if(updatedProperty == null) return NotFound(new { message = $"Property with ID {id} not found after updating features." });
+
+                var PropertyGet = new PropertyGet
+                {
+                    Id = updatedProperty.Id,
+                    Name = updatedProperty.Name,
+                    Code = updatedProperty.Code,
+                    Description = updatedProperty.Description,
+                    Price = updatedProperty.Price,
+                    Currency = updatedProperty.Currency,
+                    Location = updatedProperty.Location,
+                    City = updatedProperty.City,
+                    State = updatedProperty.State,
+                    Country = updatedProperty.Country,
+                    Latitude = updatedProperty.Latitude,
+                    Longitude = updatedProperty.Longitude,
+                    Bathrooms = updatedProperty.Bathrooms,
+                    Bedrooms = updatedProperty.Bedrooms,
+                    SQFT = updatedProperty.SQFT,
+                    ParkingSpaces = updatedProperty.ParkingSpaces,
+                    Type = updatedProperty.Type,
+                    ListingType = updatedProperty.ListingType,
+                    Image = updatedProperty.Image,
+                    Images = updatedProperty.Images,
+                    Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
+                    CreatedAt = updatedProperty.CreatedAt,
+                    UpdatedAt = updatedProperty.UpdatedAt,
+                    Status = updatedProperty.Status,
+                    Features = updatedProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
+                    {
+                        Feature = f.Feature,
+                        Value = f.Value
+                    }).ToList()
+                };
+
+                return Ok(PropertyGet);
+
+
+            }
+            catch (Exception ex)
+            {
+                return Problem(
+                    detail: "An error occurred while updating the property features. Please try again later. " + ex.Message,
                     statusCode: 500
                 );
             }
@@ -784,6 +921,7 @@ namespace RealEstateAPI.Controllers
                     Bedrooms = updatedProperty.Bedrooms,
                     SQFT = updatedProperty.SQFT,
                     ParkingSpaces = updatedProperty.ParkingSpaces,
+                    ListingType = updatedProperty.ListingType,
                     Type = updatedProperty.Type,
                     Image = updatedProperty.Image,
                     Images = updatedProperty.Images,
