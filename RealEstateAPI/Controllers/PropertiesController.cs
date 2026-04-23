@@ -8,6 +8,18 @@ using System.Security.Claims;
 
 namespace RealEstateAPI.Controllers
 {
+
+    public class ResponsePagination<T>
+    {
+        public List<T> Properties { get; set; } = new List<T>();
+        public int CurrentPage { get; set; }
+        public int TotalPages { get; set; }
+        public int PageSize { get; set; }
+        public int TotalCount { get; set; }
+    }
+
+
+
     [Route("api/[controller]")]
     [ApiController]
     public class PropertiesController : ControllerBase
@@ -29,6 +41,7 @@ namespace RealEstateAPI.Controllers
 
         [HttpGet]
         public async Task<ActionResult<List<PropertyGet>>> Get(int Page = 1,
+            int PageSize = 10,
             string? Name = null,
             string? Code = null,
             ListingType? listingType = null,
@@ -40,10 +53,11 @@ namespace RealEstateAPI.Controllers
             {
 
                 //pagination
-                int pageSize = 50;
-
+                int pageSize = PageSize;
 
                 var query = _context.Properties.AsQueryable();
+
+                var totalCount = await query.CountAsync();
 
                 if (!string.IsNullOrEmpty(Name)) query = query.Where(p => p.Name.Contains(Name));
 
@@ -60,10 +74,16 @@ namespace RealEstateAPI.Controllers
                     query = query.Where(p => p.Status == (PropertyStatus)Status);
                 }
 
+                if(listingType != null && Enum.IsDefined(typeof(ListingType), listingType))
+                {
+                    query = query.Where(p => p.ListingType == (ListingType)listingType);
+                }
+
 
                 var properties = await query
                     .Skip((Page - 1) * pageSize)
                     .Take(pageSize)
+                    .OrderByDescending(p => p.CreatedAt)
                     .Select(p => new PropertyGet
                     {
                         Id = p.Id,
@@ -100,11 +120,17 @@ namespace RealEstateAPI.Controllers
                     })
                     .ToListAsync();
 
-                
 
+                    var response = new ResponsePagination<PropertyGet>
+                    {
+                        Properties = properties,
+                        CurrentPage = Page,
+                        TotalPages = (int)Math.Ceiling((double)totalCount / pageSize),
+                        PageSize = pageSize,
+                        TotalCount = properties.Count,
+                    };
 
-
-                return properties;
+                return Ok(response);
             }
             catch (Exception ex)
             {
