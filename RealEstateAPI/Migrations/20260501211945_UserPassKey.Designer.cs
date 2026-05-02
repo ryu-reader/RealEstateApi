@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using RealEstateAPI;
 
@@ -11,9 +12,11 @@ using RealEstateAPI;
 namespace RealEstateAPI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260501211945_UserPassKey")]
+    partial class UserPassKey
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -430,10 +433,6 @@ namespace RealEstateAPI.Migrations
 
                     b.Property<uint>("SignCount")
                         .HasColumnType("int unsigned");
-
-                    b.Property<byte[]>("UserHandle")
-                        .IsRequired()
-                        .HasColumnType("longblob");
 
                     b.Property<string>("UserId")
                         .IsRequired()

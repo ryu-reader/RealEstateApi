@@ -110,7 +110,8 @@ namespace RealEstateAPI.Models
     {
         Available = 0,
         Sold = 1,
-        Pending = 2
+        Pending = 2,
+        Rented = 3
     }
 
 
@@ -166,6 +167,8 @@ namespace RealEstateAPI.Models
 
         public List<PropertyFeatureResponseDto> Features { get; set; } = new();
 
+        public Owner? Owner { get; set; } = null!;
+
     }
 
     public class Property
@@ -220,6 +223,9 @@ namespace RealEstateAPI.Models
         public PropertyStatus Status { get; set; } = PropertyStatus.Available;
 
         public List<PropertyFeature> PropertyFeatures { get; set; } = new();
+
+        public Owner? Owner { get; set; } = null!;
+
 
     }
 }

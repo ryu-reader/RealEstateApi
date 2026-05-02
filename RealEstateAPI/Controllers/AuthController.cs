@@ -1,14 +1,19 @@
 ﻿using Fido2NetLib;
 using Fido2NetLib.Objects;
+
+
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using RealEstateAPI.Models;
+using System.Buffers.Text;
 using System.Runtime;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
+using static Fido2NetLib.AuthenticatorAttestationRawResponse;
 
 namespace RealEstateAPI.Controllers
 {
@@ -23,12 +28,19 @@ namespace RealEstateAPI.Controllers
         private readonly IFido2 _fido2;
 
 
-        public AuthController(ApplicationDbContext context, ILogger<AuthController> logger, JwtService jwt)
+        public AuthController(ApplicationDbContext context, ILogger<AuthController> logger, JwtService jwt, IFido2 fido2)
         {
             _context = context;
             _logger = logger;
             _jwt = jwt;
+            _fido2 = fido2;
         }
+
+        private string FormatException(Exception e)
+        {
+            return string.Format("{0}{1}", e.Message, e.InnerException != null ? " (" + e.InnerException.Message + ")" : "");
+        }
+
 
         [HttpGet("me")]
         [Authorize]
@@ -75,7 +87,7 @@ namespace RealEstateAPI.Controllers
 
             // Verificar contraseña con BCrypt
             if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.Password))
-                return Unauthorized("Invalid username or password.");
+                return Unauthorized("Invalid password.");
 
             // Generar tokens
             var accessToken = _jwt.GenerateAccessToken(user);
@@ -303,8 +315,224 @@ namespace RealEstateAPI.Controllers
             return Ok(new { accessToken = newAccessToken, refreshToken = newRefreshToken });
         }
 
-        
 
+
+        /* FIDO 2 */
+        [HttpPost("passkey/register/options")]
+        public IActionResult RegisterPasskeyOptions([FromBody] int userId)
+        {
+            var user = _context.Users.Find(userId);
+
+            var fidoUser = new Fido2User
+            {
+                DisplayName = user.Name,
+                Name = user.Email,
+                Id = Encoding.UTF8.GetBytes(user.Id.ToString())
+            };
+
+            var existingCredentials = _context.UserPasskeys
+                .Where(x => x.UserId == userId.ToString())
+                .Select(x => new PublicKeyCredentialDescriptor(x.CredentialId))
+                .ToList();
+
+            var options = _fido2.RequestNewCredential(new RequestNewCredentialParams
+            {
+                User = fidoUser,
+                ExcludeCredentials = existingCredentials,
+                AuthenticatorSelection = AuthenticatorSelection.Default,
+                Extensions = new AuthenticationExtensionsClientInputs
+                {
+                    CredProps = true  // Enable credential properties extension
+                }
+            });
+
+            HttpContext.Session.SetString("fido.attestationOptions", options.ToJson());
+
+            return Ok(options);
+        }
+
+        [HttpPost("passkey/register/verify")]
+        public async Task<IActionResult> RegisterPasskeyVerify([FromBody] AuthenticatorAttestationRawResponse credential)
+        {
+            var jsonOptions = HttpContext.Session.GetString("fido.attestationOptions");
+            var options = CredentialCreateOptions.FromJson(jsonOptions);
+
+            IsCredentialIdUniqueToUserAsyncDelegate callback = async (args, token) =>
+            {
+                var credentialIds = _context.UserPasskeys
+                    .Select(x => x.CredentialId)
+                    .AsEnumerable();
+
+                bool exists = !credentialIds.Any(x => x.SequenceEqual(args.CredentialId));
+
+                return await Task.FromResult(exists);
+            };
+
+            var success = await _fido2.MakeNewCredentialAsync(
+                new MakeNewCredentialParams
+                {
+                    AttestationResponse = credential,
+                    OriginalOptions = options,
+                    IsCredentialIdUniqueToUserCallback = callback
+                });
+
+            var userId = int.Parse(Encoding.UTF8.GetString(options.User.Id));
+
+            var passkey = new UserPasskey
+            {
+                UserId = userId.ToString(),
+                UserHandle = options.User.Id,
+                CredentialId = success.Id,
+                PublicKey = success.PublicKey,
+                SignCount = success.SignCount,
+                DeviceName = "Passkey Device"
+            };
+
+            _context.UserPasskeys.Add(passkey);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                success = true
+            });
+        }
+
+        [HttpPost("passkey/login/verify")]
+        public async Task<IActionResult> LoginPasskeyVerify([FromBody] JsonElement body)
+        {
+            var rawJson = body.GetRawText();
+            Console.WriteLine(rawJson);
+
+            var clientResponse = System.Text.Json.JsonSerializer.Deserialize<AuthenticatorAssertionRawResponse>(rawJson);
+
+            if (clientResponse == null)
+                return BadRequest("No se pudo leer assertion response.");
+
+            var jsonOptions = HttpContext.Session.GetString("fido.assertionOptions");
+            var options = AssertionOptions.FromJson(jsonOptions);
+
+            var storedCredential = _context.UserPasskeys
+                .AsEnumerable()
+                .FirstOrDefault(x => x.CredentialId.SequenceEqual(clientResponse.RawId));
+
+            if (storedCredential == null)
+                return BadRequest("Credencial no encontrada.");
+
+            IsUserHandleOwnerOfCredentialIdAsync callback = async (args, token) =>
+            {
+                bool isOwner = _context.UserPasskeys
+                    .AsEnumerable()
+                    .Any(x =>
+                        x.UserHandle.SequenceEqual(args.UserHandle) &&
+                        x.CredentialId.SequenceEqual(args.CredentialId));
+
+                return await Task.FromResult(isOwner);
+            };
+
+            var result = await _fido2.MakeAssertionAsync(
+                new MakeAssertionParams
+                {
+                    AssertionResponse = clientResponse,
+                    OriginalOptions = options,
+                    StoredPublicKey = storedCredential.PublicKey,
+                    StoredSignatureCounter = storedCredential.SignCount,
+                    IsUserHandleOwnerOfCredentialIdCallback = callback
+                });
+
+            storedCredential.SignCount = result.SignCount;
+            _context.UserPasskeys.Update(storedCredential);
+            await _context.SaveChangesAsync();
+
+            int IdUser = int.Parse(Encoding.UTF8.GetString(storedCredential.UserHandle));
+
+            Console.WriteLine("User ID from UserHandle: " + IdUser);
+
+            var user = _context.Users
+                .Include(u => u.Role)
+                .FirstOrDefault(u => u.Id == IdUser);
+             if (user == null)
+                return BadRequest("Usuario no encontrado.");
+
+            // Generar tokens
+            var accessToken = _jwt.GenerateAccessToken(user);
+            var refreshToken = _jwt.GenerateRefreshToken();
+
+            //Get Permissions
+
+            var roleName = user.Role?.Name;
+
+            var permissions = _context.Roles
+                .Include(r => r.PermissionsRole)
+                    .ThenInclude(pr => pr.Permission)
+                .Where(r => r.Name == roleName)
+                .SelectMany(r => r.PermissionsRole.Select(p => p.Permission.Type))
+                .ToList();
+
+
+            // Guardar refresh token en DB
+            user.RefreshToken = refreshToken;
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+            await _context.SaveChangesAsync();
+
+            Response.Cookies.Append("access_token", accessToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Expires = DateTime.UtcNow.AddMinutes(15)
+            });
+
+            Response.Cookies.Append("refresh_token", refreshToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+
+                Expires = DateTime.UtcNow.AddDays(7)
+            });
+
+            return Ok(new
+            {
+                accessToken,
+                refreshToken,
+                User = user,
+                Permissions = permissions,
+                username = user.Username,
+                role = user.Role.Name,
+                userId = user.Id
+            });
+        }
+
+
+        [HttpPost("passkey/login/options")]
+        public IActionResult LoginPasskeyOptions([FromBody] int userId)
+        {
+            var credentials = _context.UserPasskeys
+                .Where(x => x.UserId == userId.ToString())
+                .Select(x => new PublicKeyCredentialDescriptor(x.CredentialId))
+                .ToList();
+
+            if (!credentials.Any())
+                return BadRequest("Usuario no tiene passkeys registradas");
+
+
+            var options = _fido2.GetAssertionOptions(new GetAssertionOptionsParams
+            {
+                AllowedCredentials = credentials,
+                UserVerification = UserVerificationRequirement.Preferred,
+                Extensions = new AuthenticationExtensionsClientInputs
+                {
+                    Extensions = true
+                }
+            });
+
+            HttpContext.Session.SetString("fido.assertionOptions", options.ToJson());
+
+            return Ok(options);
+        }
+
+
+        
 
 
 

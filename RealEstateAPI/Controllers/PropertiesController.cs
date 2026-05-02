@@ -1034,6 +1034,193 @@ namespace RealEstateAPI.Controllers
             return File(imageBytes, contentType);
         }
 
+
+
+        [HttpPost]
+        [Route("mark-as-pending/{id}")]
+        [Authorize]
+        public async Task<ActionResult<PropertyGet>> MarkAsPending(int id)
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.EDIT_PROPERTY);
+                if (!permission)
+                {
+                    return StatusCode(403, new { message = "You do not have permission to edit properties." });
+                }
+                var existingProperty = await _context.Properties.FindAsync(id);
+                if (existingProperty == null)
+                {
+                    return NotFound(new { message = $"Property with ID {id} not found." });
+                }
+                existingProperty.Status = PropertyStatus.Pending;
+                await _context.SaveChangesAsync();
+                var updatedProperty = await _context.Properties
+                    .Include(p => p.CreatedBy)
+                    .Include(p => p.Owner)
+                    .FirstOrDefaultAsync(p => p.Id == id);
+                if(updatedProperty == null) return NotFound(new { message = $"Property with ID {id} not found after marking as pending." });
+                var PropertyGet = new PropertyGet
+                {
+                    Id = updatedProperty.Id,
+                    Name = updatedProperty.Name,
+                    Code = updatedProperty.Code,
+                    Description = updatedProperty.Description,
+                    Price = updatedProperty.Price,
+                    Currency = updatedProperty.Currency,
+                    Location = updatedProperty.Location,
+                    City = updatedProperty.City,
+                    State = updatedProperty.State,
+                    Country = updatedProperty.Country,
+                    Latitude = updatedProperty.Latitude,
+                    Longitude = updatedProperty.Longitude,
+                    Bathrooms = updatedProperty.Bathrooms,
+                    Bedrooms = updatedProperty.Bedrooms,
+                    SQFT = updatedProperty.SQFT,
+                    ParkingSpaces = updatedProperty.ParkingSpaces,
+                    ListingType = updatedProperty.ListingType,
+                    Type = updatedProperty.Type,
+                    Image = updatedProperty.Image,
+                    Images = updatedProperty.Images,
+                    Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
+                    CreatedAt = updatedProperty.CreatedAt,
+                    UpdatedAt = updatedProperty.UpdatedAt,
+                    Owner = updatedProperty.Owner,
+                    Status = updatedProperty.Status,
+                    Features = updatedProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
+                    {
+                        Feature = f.Feature,
+                        Value = f.Value
+                    }).ToList()
+                };
+                return Ok(PropertyGet);
+            }
+            catch (Exception ex)
+            {
+                return Problem(
+                    detail: "An error occurred while marking the property as pending. Please try again later. " + ex.Message
+                );
+            }
+        }
+
+        [HttpPost]
+        [Route("sale/{id}")]
+        [Authorize]
+        public async Task<ActionResult<PropertyGet>> MarkAsSold(int id, int Owner)
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.EDIT_PROPERTY);
+                if (!permission)
+                {
+                    return StatusCode(403, new { message = "You do not have permission to edit properties." });
+                }
+
+                
+                var existingProperty = await _context.Properties.FindAsync(id);
+                if (existingProperty == null)
+                {
+                    return NotFound(new { message = $"Property with ID {id} not found." });
+                }
+
+                if(existingProperty.ListingType == ListingType.Rent)
+                {
+                    return BadRequest(new { message = "Only properties for sale can be marked as sold." });
+                }
+
+                if(existingProperty.Status == PropertyStatus.Sold)
+                {
+                    return BadRequest(new { message = "Property is already marked as sold." });
+                }
+
+                if(existingProperty.Status != PropertyStatus.Pending)
+                {
+                    return BadRequest(new { message = "Only properties with pending status can be marked as sold." });
+                }
+
+                var HasCreated = _context.Properties.
+                    Include(p => p.CreatedBy)
+                    .ThenInclude(u => u.Role)
+                    .FirstOrDefault(p => p.Id == id);
+
+
+                var MyUser = await _context.Users.FindAsync(Convert.ToInt32(userId));
+
+                if (MyUser == null)
+                {
+                    return StatusCode(403, new { message = "User not found." });
+                }
+
+                bool CanEdit = HasCreated != null && HasCreated.CreatedBy != null && HasCreated.CreatedBy.Id != Convert.ToInt32(userId) && !_userPermission.VerifiedRoleLevel(MyUser.Id, HasCreated.CreatedBy.Role.Level);
+
+
+                if (CanEdit)
+                {
+                    return StatusCode(403, new { message = "You can`t edit this property" });
+                }
+
+
+                var owner = await _context.Owners.FindAsync(Owner);
+                 if (owner == null)
+                {
+                    return NotFound(new { message = $"Owner with ID {Owner} not found." });
+                }
+
+
+
+                existingProperty.Owner = owner;
+                existingProperty.Status = PropertyStatus.Sold;
+                await _context.SaveChangesAsync();
+                var updatedProperty = await _context.Properties
+                    .Include(p => p.CreatedBy)
+                    .Include(p => p.Owner)
+                    .FirstOrDefaultAsync(p => p.Id == id);
+                if(updatedProperty == null) return NotFound(new { message = $"Property with ID {id} not found after marking as sold." });
+                var PropertyGet = new PropertyGet
+                {
+                    Id = updatedProperty.Id,
+                    Name = updatedProperty.Name,
+                    Code = updatedProperty.Code,
+                    Description = updatedProperty.Description,
+                    Price = updatedProperty.Price,
+                    Currency = updatedProperty.Currency,
+                    Location = updatedProperty.Location,
+                    City = updatedProperty.City,
+                    State = updatedProperty.State,
+                    Country = updatedProperty.Country,
+                    Latitude = updatedProperty.Latitude,
+                    Longitude = updatedProperty.Longitude,
+                    Bathrooms = updatedProperty.Bathrooms,
+                    Bedrooms = updatedProperty.Bedrooms,
+                    SQFT = updatedProperty.SQFT,
+                    ParkingSpaces = updatedProperty.ParkingSpaces,
+                    ListingType = updatedProperty.ListingType,
+                    Type = updatedProperty.Type,
+                    Image = updatedProperty.Image,
+                    Images = updatedProperty.Images,
+                    Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
+                    CreatedAt = updatedProperty.CreatedAt,
+                    UpdatedAt = updatedProperty.UpdatedAt,
+                    Owner = updatedProperty.Owner,
+                    Status = updatedProperty.Status,
+                    Features = updatedProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
+                    {
+                        Feature = f.Feature,
+                        Value = f.Value
+                    }).ToList()
+                };
+                return Ok(PropertyGet);
+            }
+            catch (Exception ex)
+            {
+                return Problem(
+                    detail: "An error occurred while marking the property as sold. Please try again later. " + ex.Message
+                );
+            }
+        }   
+
         // Agrega este método privado en la clase PropertiesController para solucionar CS0103
         private string GetContentTypeImage(string path)
         {

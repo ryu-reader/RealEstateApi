@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Fido2NetLib;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -72,12 +73,25 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+builder.Services.AddDistributedMemoryCache();
+
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(20);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.Cookie.SameSite = SameSiteMode.None;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+});
+
+
 builder.Services.AddFido2(options =>
 {
-    options.ServerDomain = "https://localhost:7011";
+    options.ServerDomain = "localhost";
     options.ServerName = "RealEstate";
-    options.Origins = new HashSet<string> { "https://localhost:7011" };
-});
+    options.Origins = new HashSet<string> { "https://localhost:7011", "http://localhost:5173" };
+})    
+;
 
 /*
 builder.Services.AddAuthorization(options =>
@@ -130,6 +144,11 @@ app.UseHttpsRedirection();
 app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
+
+app.UseRouting();
+
+app.UseSession();
+
 app.UseAuthorization();
 
 app.MapControllers();
