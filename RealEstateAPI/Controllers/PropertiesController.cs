@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RealEstateAPI.DTO;
 using RealEstateAPI.Models;
 using RealEstateAPI.Security;
 using System.Security.Claims;
@@ -57,7 +58,8 @@ namespace RealEstateAPI.Controllers
 
                 var query = _context.Properties.AsQueryable();
 
-                var totalCount = await query.CountAsync();
+                query = query.Include(x => x.Owner);
+
 
                 if (!string.IsNullOrEmpty(Name)) query = query.Where(p => p.Name.Contains(Name));
 
@@ -78,6 +80,8 @@ namespace RealEstateAPI.Controllers
                 {
                     query = query.Where(p => p.ListingType == (ListingType)listingType);
                 }
+
+                var totalCount = await query.CountAsync();
 
 
                 var properties = await query
@@ -102,7 +106,7 @@ namespace RealEstateAPI.Controllers
                         Bedrooms = p.Bedrooms,
                         SQFT = p.SQFT,
                         ParkingSpaces = p.ParkingSpaces,
-                        
+                        Owner = p.Owner,
                         ListingType = p.ListingType,
                         Type = p.Type,
                         Image = p.Image,
@@ -1105,9 +1109,150 @@ namespace RealEstateAPI.Controllers
         }
 
         [HttpPost]
+        [Route("sale/reset/{id}")]
+        [Authorize]
+        public async Task<ActionResult> ResetSaleStatus(int id, [FromBody] SaleResetDTO saleResetDTO)
+        {
+
+            try
+            {
+
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.EDIT_PROPERTY);
+
+                if (!permission)
+                {
+                    return StatusCode(403, new { message = "You do not have permission to edit properties." });
+                }
+
+                var existingProperty = await _context.Properties.FindAsync(id);
+
+                if (existingProperty == null)
+                {
+                    return NotFound(new { message = $"Property with ID {id} not found." });
+                }
+
+
+                var countOfPropertiesWithSameOwner = _context.Properties.Where(x => x.Owner != null && existingProperty.Owner != null && x.Owner.Id == existingProperty.Owner.Id).Count();
+
+                if (saleResetDTO.DeleteOwner && existingProperty.Owner != null && countOfPropertiesWithSameOwner <= 1)
+                {
+                    _context.Owners.Remove(existingProperty.Owner);
+                }
+
+
+
+                existingProperty.Status = PropertyStatus.Available;
+
+
+
+                await _context.SaveChangesAsync();
+                var updatedProperty = await _context.Properties
+                    .Include(p => p.CreatedBy)
+                    .Include(p => p.Owner)
+                    .FirstOrDefaultAsync(p => p.Id == id);
+                if (updatedProperty == null) return NotFound(new { message = $"Property with ID {id} not found after resetting sale status." });
+                
+                return Ok();
+            }
+
+            catch (Exception ex)
+            {
+                return Problem(
+                    detail: "An error occurred while resetting the property sale status. Please try again later. " + ex.Message,
+                    statusCode: 500
+                    );
+            }
+        }
+        
+
+
+        [HttpPost]
+        [Route("sale/marking-as-process/{id}")]
+        [Authorize]
+        public async Task<ActionResult<PropertyGet>> MarkAsProcess(int id, [FromBody] SaleMarkingProcessDTO dto)
+        {
+            try
+            {
+             
+                var ownerId = dto.OwnerId;
+
+
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.EDIT_PROPERTY);
+                if (!permission)
+                {
+                    return StatusCode(403, new { message = "You do not have permission to edit properties." });
+                }
+                var existingProperty = await _context.Properties.FindAsync(id);
+                if (existingProperty == null)
+                {
+                    return NotFound(new { message = $"Property with ID {id} not found." });
+                }
+
+                var owner = await _context.Owners.FindAsync(ownerId);
+
+                if (owner == null)
+                {
+                    return NotFound(new { message = $"Owner with ID {ownerId} not found." });
+                }
+
+                existingProperty.Owner = owner;
+                existingProperty.Status = PropertyStatus.InProcess;
+                await _context.SaveChangesAsync();
+                var updatedProperty = await _context.Properties
+                    .Include(p => p.CreatedBy)
+                    .Include(p => p.Owner)
+                    .FirstOrDefaultAsync(p => p.Id == id);
+                if(updatedProperty == null) return NotFound(new { message = $"Property with ID {id} not found after marking as in process." });
+                var PropertyGet = new PropertyGet
+                {
+                    Id = updatedProperty.Id,
+                    Name = updatedProperty.Name,
+                    Code = updatedProperty.Code,
+                    Description = updatedProperty.Description,
+                    Price = updatedProperty.Price,
+                    Currency = updatedProperty.Currency,
+                    Location = updatedProperty.Location,
+                    City = updatedProperty.City,
+                    State = updatedProperty.State,
+                    Country = updatedProperty.Country,
+                    Latitude = updatedProperty.Latitude,
+                    Longitude = updatedProperty.Longitude,
+                    Bathrooms = updatedProperty.Bathrooms,
+                    Bedrooms = updatedProperty.Bedrooms,
+                    SQFT = updatedProperty.SQFT,
+                    ParkingSpaces = updatedProperty.ParkingSpaces,
+                    ListingType = updatedProperty.ListingType,
+                    Type = updatedProperty.Type,
+                    Image = updatedProperty.Image,
+                    Images = updatedProperty.Images,
+                    Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
+                    CreatedAt = updatedProperty.CreatedAt,
+                    UpdatedAt = updatedProperty.UpdatedAt,
+                    Owner = updatedProperty.Owner,
+                    Status = updatedProperty.Status,
+                    Features = updatedProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
+                    {
+                        Feature = f.Feature,
+                        Value = f.Value
+                    }).ToList()
+                };
+                return Ok(PropertyGet);
+            }
+            catch (Exception ex)
+            {
+                return Problem(
+                    detail: "An error occurred while marking the property as in process. Please try again later. " + ex.Message,
+                    statusCode: 500);
+            }
+        }
+
+
+        [HttpPost]
         [Route("sale/{id}")]
         [Authorize]
-        public async Task<ActionResult<PropertyGet>> MarkAsSold(int id, int Owner)
+        public async Task<ActionResult<PropertyGet>> MarkAsSold(int id)
         {
             try
             {
@@ -1135,10 +1280,7 @@ namespace RealEstateAPI.Controllers
                     return BadRequest(new { message = "Property is already marked as sold." });
                 }
 
-                if(existingProperty.Status != PropertyStatus.Pending)
-                {
-                    return BadRequest(new { message = "Only properties with pending status can be marked as sold." });
-                }
+             
 
                 var HasCreated = _context.Properties.
                     Include(p => p.CreatedBy)
@@ -1162,15 +1304,13 @@ namespace RealEstateAPI.Controllers
                 }
 
 
-                var owner = await _context.Owners.FindAsync(Owner);
-                 if (owner == null)
+               if(existingProperty.Owner == null)
                 {
-                    return NotFound(new { message = $"Owner with ID {Owner} not found." });
+                    return BadRequest(new { message = "Property must have an owner before being marked as sold." });
                 }
 
 
 
-                existingProperty.Owner = owner;
                 existingProperty.Status = PropertyStatus.Sold;
                 await _context.SaveChangesAsync();
                 var updatedProperty = await _context.Properties

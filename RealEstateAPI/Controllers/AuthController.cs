@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using RealEstateAPI.DTO;
 using RealEstateAPI.Models;
 using System.Buffers.Text;
 using System.Runtime;
@@ -66,8 +67,6 @@ namespace RealEstateAPI.Controllers
                         .Where(r => r.Name == role)
                         .SelectMany(r => r.PermissionsRole.Select(p => p.Permission.Type))
                         .ToList();
-
-            
 
 
             return Ok(new { MyUser, Permissions});
@@ -240,6 +239,27 @@ namespace RealEstateAPI.Controllers
         }
         */
 
+        [HttpPost("find-user")]
+        public async Task<ActionResult<bool>> FindUser([FromBody] FindUserDTO dTO)
+        {
+
+            try
+            {
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == dTO.UsernameOrEmail || u.Email == dTO.UsernameOrEmail);
+                if (user != null)
+                {
+                    return Ok(true);
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing your request: " + ex.Message);
+            }
+
+
+            return NotFound(false);
+        }
+
 
         [HttpGet("logout")]
         [Authorize]
@@ -270,6 +290,8 @@ namespace RealEstateAPI.Controllers
 
             return Ok("Logged out successfully.");
         }
+
+
 
 
         [HttpPost("refresh")]
@@ -505,8 +527,17 @@ namespace RealEstateAPI.Controllers
 
 
         [HttpPost("passkey/login/options")]
-        public IActionResult LoginPasskeyOptions([FromBody] int userId)
+        public IActionResult LoginPasskeyOptions([FromBody] FindUserDTO findUser)
         {
+
+            var user = _context.Users.FirstOrDefault(x => x.Username == findUser.UsernameOrEmail || x.Email == findUser.UsernameOrEmail);
+
+            if (user == null)
+                return BadRequest("Usuario no encontrado.");
+
+            var userId = user.Id;
+
+
             var credentials = _context.UserPasskeys
                 .Where(x => x.UserId == userId.ToString())
                 .Select(x => new PublicKeyCredentialDescriptor(x.CredentialId))
@@ -531,9 +562,148 @@ namespace RealEstateAPI.Controllers
             return Ok(options);
         }
 
+        // Endpoint para login con passkey sin necesidad de enviar userId
 
-        
+        [HttpPost("passkey/login/device/options")]
+        public IActionResult LoginDevicePasskeyOptions()
+        {
+            var options = _fido2.GetAssertionOptions(
+                new GetAssertionOptionsParams
+                {
+                    AllowedCredentials = new List<PublicKeyCredentialDescriptor>(),
+                    UserVerification = UserVerificationRequirement.Preferred
+                });
 
+            HttpContext.Session.SetString("fido.assertionOptions", options.ToJson());
+
+            return Ok(options);
+        }
+
+        [HttpPost("passkey/login/device/verify")]
+        public async Task<IActionResult> LoginDevicePasskeyVerify([FromBody] JsonElement body)
+        {
+            var rawJson = body.GetRawText();
+
+            var clientResponse = System.Text.Json.JsonSerializer.Deserialize<AuthenticatorAssertionRawResponse>(rawJson);
+
+            if (clientResponse == null)
+                return BadRequest();
+
+            var jsonOptions = HttpContext.Session.GetString("fido.assertionOptions");
+            var options = AssertionOptions.FromJson(jsonOptions);
+
+            var storedCredential = _context.UserPasskeys
+                .AsEnumerable()
+                .FirstOrDefault(x => x.CredentialId.SequenceEqual(clientResponse.RawId));
+
+            if (storedCredential == null)
+                return BadRequest("Credencial no encontrada.");
+
+            IsUserHandleOwnerOfCredentialIdAsync callback = async (args, token) =>
+            {
+                bool isOwner = _context.UserPasskeys
+                    .AsEnumerable()
+                    .Any(x =>
+                        x.UserHandle.SequenceEqual(args.UserHandle) &&
+                        x.CredentialId.SequenceEqual(args.CredentialId));
+
+                return await Task.FromResult(isOwner);
+            };
+
+            var result = await _fido2.MakeAssertionAsync(
+                new MakeAssertionParams
+                {
+                    AssertionResponse = clientResponse,
+                    OriginalOptions = options,
+                    StoredPublicKey = storedCredential.PublicKey,
+                    StoredSignatureCounter = storedCredential.SignCount,
+                    IsUserHandleOwnerOfCredentialIdCallback = callback
+                });
+
+            storedCredential.SignCount = result.SignCount;
+            _context.UserPasskeys.Update(storedCredential);
+            await _context.SaveChangesAsync();
+
+            var userId = int.Parse(Encoding.UTF8.GetString(storedCredential.UserHandle));
+
+            var user = _context.Users
+                .Include(x => x.Role)
+                .FirstOrDefault(x => x.Id == userId);
+
+
+            // Generar tokens
+            var accessToken = _jwt.GenerateAccessToken(user);
+            var refreshToken = _jwt.GenerateRefreshToken();
+
+            //Get Permissions
+
+            var roleName = user.Role?.Name;
+
+            var permissions = _context.Roles
+                .Include(r => r.PermissionsRole)
+                    .ThenInclude(pr => pr.Permission)
+                .Where(r => r.Name == roleName)
+                .SelectMany(r => r.PermissionsRole.Select(p => p.Permission.Type))
+                .ToList();
+
+
+            // Guardar refresh token en DB
+            user.RefreshToken = refreshToken;
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+            await _context.SaveChangesAsync();
+
+            Response.Cookies.Append("access_token", accessToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Expires = DateTime.UtcNow.AddMinutes(15)
+            });
+
+            Response.Cookies.Append("refresh_token", refreshToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+
+                Expires = DateTime.UtcNow.AddDays(7)
+            });
+
+            return Ok(new
+            {
+                accessToken,
+                refreshToken,
+                User = user,
+                Permissions = permissions,
+                username = user.Username,
+                role = user.Role.Name,
+                userId = user.Id
+            });
+
+
+
+
+        }
+
+        //var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        [HttpGet("passkey/health-check/options")]
+        [Authorize]
+        public IActionResult HealthCheckOptions()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            var credentials = _context.UserPasskeys
+                .Where(x => x.UserId == userId)
+                .Select(x => Base64Url.EncodeToString(x.CredentialId))
+                .ToList();
+
+            return Ok(new
+            {
+                userId = Base64Url.EncodeToString(System.Text.Encoding.UTF8.GetBytes(userId)),
+                credentialIds = credentials
+            });
+        }
 
 
     }

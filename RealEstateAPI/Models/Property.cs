@@ -111,7 +111,8 @@ namespace RealEstateAPI.Models
         Available = 0,
         Sold = 1,
         Pending = 2,
-        Rented = 3
+        Rented = 3,
+        InProcess = 4
     }
 
 
