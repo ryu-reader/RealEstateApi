@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RealEstateAPI.DTO.Role;
 using RealEstateAPI.Models;
 using RealEstateAPI.Security;
 using System.Security.Claims;
@@ -87,7 +88,7 @@ namespace RealEstateAPI.Controllers
 
         [HttpPost]
         [Authorize]
-        public async Task<ActionResult<Role>> CreateRole([FromBody] RoleAddDTO dTO)
+        public async Task<ActionResult<Role>> CreateRole([FromBody] RoleAddRequestDTO dTO)
         {
             try
             {
@@ -134,7 +135,7 @@ namespace RealEstateAPI.Controllers
         [HttpPut]
         [Route("{id}")]
         [Authorize]
-        public async Task<ActionResult<Role>> UpdateRole(int id, [FromBody] RoleAddDTO dTO)
+        public async Task<ActionResult<Role>> UpdateRole(int id, [FromBody] RoleEditRequestDTO dTO)
         {
             try
             {

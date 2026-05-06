@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using RealEstateAPI.DTO;
+using RealEstateAPI.DTO.User;
 using RealEstateAPI.Models;
 using System.Buffers.Text;
 using System.Runtime;
@@ -42,14 +43,53 @@ namespace RealEstateAPI.Controllers
             return string.Format("{0}{1}", e.Message, e.InnerException != null ? " (" + e.InnerException.Message + ")" : "");
         }
 
+        private void AppendTokenCookie(string token, int expiresInMinutes)
+        {
+            Response.Cookies.Append("access_token", token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Expires = DateTime.UtcNow.AddMinutes(expiresInMinutes)
+            });
+        }
+
+        private void AppendRefreshTokenCookie(string token, int expiresInDays)
+        {
+            Response.Cookies.Append("refresh_token", token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Expires = DateTime.UtcNow.AddDays(expiresInDays)
+            });
+        }
+
+        private void DeleteTokenCookies()
+        {
+            Response.Cookies.Delete("access_token", new CookieOptions
+            {
+                Path = "/",
+                SameSite = SameSiteMode.None,
+                Secure = true
+            });
+            Response.Cookies.Delete("refresh_token", new CookieOptions
+            {
+                Path = "/",
+                SameSite = SameSiteMode.None,
+                Secure = true
+            });
+        }
 
         [HttpGet("me")]
         [Authorize]
-        public async Task<ActionResult<Models.User>> GetUserInfo()
+        public async Task<ActionResult<LoginResponseDTO>> GetUserInfo()
         {
             // Obtienes info del token
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             var username = User.Identity?.Name;
+            var token = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+
 
             var role = _context.Users
                         .Include(u => u.Role)
@@ -69,13 +109,30 @@ namespace RealEstateAPI.Controllers
                         .ToList();
 
 
-            return Ok(new { MyUser, Permissions});
+            var LoginResponseDTO = new LoginResponseDTO
+            {
+                User = new UserResponseDTO
+                {
+                    Id = MyUser.Id.ToString(),
+                    Name = MyUser.Name,
+                    Email = MyUser.Email,
+                    Image = MyUser.Image,
+                    Role = MyUser.Role,
+                    Username = MyUser.Username
+                },
+                Permissions = Permissions,
+                Role = MyUser.Role.Name,
+                UserId = MyUser.Id
+            };
+
+
+            return Ok(LoginResponseDTO);
         }
 
 
 
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginDTO dto)
+        public async Task<ActionResult<LoginResponseDTO>> Login([FromBody] LoginRequestDto dto)
         {
             var user = await _context.Users
                         .Include(u => u.Role)
@@ -105,33 +162,29 @@ namespace RealEstateAPI.Controllers
             user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
             await _context.SaveChangesAsync();
 
-            Response.Cookies.Append("access_token", accessToken, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.None,
-                Expires = DateTime.UtcNow.AddMinutes(15)
-            });
+            AppendTokenCookie(accessToken, 15);
+            AppendRefreshTokenCookie(refreshToken, 7);
 
-            Response.Cookies.Append("refresh_token", refreshToken, new CookieOptions
+            var LoginResponseDTO = new LoginResponseDTO
             {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.None,
-                
-                Expires = DateTime.UtcNow.AddDays(7)
-            });
+                AccessToken = accessToken,
+                RefreshToken = refreshToken,
+                User = new UserResponseDTO
+                {
+                    Id = user.Id.ToString(),
+                    Name = user.Name,
+                    Email = user.Email,
+                    Username = user.Username,
+                    Image = user.Image,
+                    Role = user.Role
+                },
+                Permissions = Permissions,
+                Role = user.Role.Name,
+                UserId = user.Id
+            };
 
-            return Ok(new
-            {
-                accessToken,
-                refreshToken,
-                User = user,
-                Permissions,
-                username = user.Username,
-                role = user.Role.Name,
-                userId = user.Id
-            });
+            return Ok(LoginResponseDTO);
+           
         }
 
         /*
@@ -273,20 +326,7 @@ namespace RealEstateAPI.Controllers
             user.RefreshTokenExpiryTime = null;
             await _context.SaveChangesAsync();
 
-            Response.Cookies.Delete("access_token", new CookieOptions
-            {
-                Path = "/",
-                SameSite = SameSiteMode.None,
-                Secure = true
-            });
-
-            Response.Cookies.Delete("refresh_token", new CookieOptions
-            {
-                Path = "/",
-                SameSite = SameSiteMode.None,
-                Secure = true
-            });
-
+            DeleteTokenCookies();
 
             return Ok("Logged out successfully.");
         }
@@ -318,21 +358,8 @@ namespace RealEstateAPI.Controllers
             await _context.SaveChangesAsync();
 
             // Actualizar cookies
-            Response.Cookies.Append("access_token", newAccessToken, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.None,
-                Expires = DateTime.UtcNow.AddMinutes(15)
-            });
-
-            Response.Cookies.Append("refresh_token", newRefreshToken, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.None,
-                Expires = DateTime.UtcNow.AddDays(1)
-            });
+            AppendTokenCookie(newAccessToken, 15);
+            AppendRefreshTokenCookie(newRefreshToken, 7);
 
             return Ok(new { accessToken = newAccessToken, refreshToken = newRefreshToken });
         }
@@ -364,7 +391,7 @@ namespace RealEstateAPI.Controllers
                 AuthenticatorSelection = AuthenticatorSelection.Default,
                 Extensions = new AuthenticationExtensionsClientInputs
                 {
-                    CredProps = true  // Enable credential properties extension
+                    CredProps = true
                 }
             });
 
@@ -374,7 +401,7 @@ namespace RealEstateAPI.Controllers
         }
 
         [HttpPost("passkey/register/verify")]
-        public async Task<IActionResult> RegisterPasskeyVerify([FromBody] AuthenticatorAttestationRawResponse credential)
+        public async Task<ActionResult<LoginResponseDTO>> RegisterPasskeyVerify([FromBody] AuthenticatorAttestationRawResponse credential)
         {
             var jsonOptions = HttpContext.Session.GetString("fido.attestationOptions");
             var options = CredentialCreateOptions.FromJson(jsonOptions);
@@ -496,33 +523,30 @@ namespace RealEstateAPI.Controllers
             user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
             await _context.SaveChangesAsync();
 
-            Response.Cookies.Append("access_token", accessToken, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.None,
-                Expires = DateTime.UtcNow.AddMinutes(15)
-            });
+            AppendTokenCookie(accessToken, 15);
+            AppendRefreshTokenCookie(refreshToken, 7);
 
-            Response.Cookies.Append("refresh_token", refreshToken, new CookieOptions
+            var LoginResponseDTO = new LoginResponseDTO
             {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.None,
-
-                Expires = DateTime.UtcNow.AddDays(7)
-            });
-
-            return Ok(new
-            {
-                accessToken,
-                refreshToken,
-                User = user,
+                AccessToken = accessToken,
+                RefreshToken = refreshToken,
+                User = new UserResponseDTO
+                {
+                    Id = user.Id.ToString(),
+                    Name = user.Name,
+                    Email = user.Email,
+                    Username = user.Username,
+                    Image = user.Image,
+                    Role = user.Role
+                },
                 Permissions = permissions,
-                username = user.Username,
-                role = user.Role.Name,
-                userId = user.Id
-            });
+                Role = user.Role.Name,
+                UserId = user.Id
+            };
+
+            return Ok(LoginResponseDTO);
+
+
         }
 
 
@@ -580,7 +604,7 @@ namespace RealEstateAPI.Controllers
         }
 
         [HttpPost("passkey/login/device/verify")]
-        public async Task<IActionResult> LoginDevicePasskeyVerify([FromBody] JsonElement body)
+        public async Task<ActionResult<LoginResponseDTO>> LoginDevicePasskeyVerify([FromBody] JsonElement body)
         {
             var rawJson = body.GetRawText();
 
@@ -652,33 +676,30 @@ namespace RealEstateAPI.Controllers
             user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
             await _context.SaveChangesAsync();
 
-            Response.Cookies.Append("access_token", accessToken, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.None,
-                Expires = DateTime.UtcNow.AddMinutes(15)
-            });
 
-            Response.Cookies.Append("refresh_token", refreshToken, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.None,
+            AppendTokenCookie(accessToken, 15);
+            AppendRefreshTokenCookie(refreshToken, 7);
 
-                Expires = DateTime.UtcNow.AddDays(7)
-            });
-
-            return Ok(new
+            var LoginResponseDTO = new LoginResponseDTO
             {
-                accessToken,
-                refreshToken,
-                User = user,
+                AccessToken = accessToken,
+                RefreshToken = refreshToken,
+                User = new UserResponseDTO
+                {
+                    Id = user.Id.ToString(),
+                    Name = user.Name,
+                    Email = user.Email,
+                    Username = user.Username,
+                    Image = user.Image,
+                    Role = user.Role
+                },
                 Permissions = permissions,
-                username = user.Username,
-                role = user.Role.Name,
-                userId = user.Id
-            });
+                Role = user.Role.Name,
+                UserId = user.Id
+            };
+
+
+            return Ok(LoginResponseDTO);
 
 
 

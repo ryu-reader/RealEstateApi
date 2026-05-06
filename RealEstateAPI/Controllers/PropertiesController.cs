@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RealEstateAPI.DTO;
+using RealEstateAPI.DTO.Properties;
 using RealEstateAPI.Models;
 using RealEstateAPI.Security;
 using System.Security.Claims;
@@ -10,14 +11,7 @@ using System.Security.Claims;
 namespace RealEstateAPI.Controllers
 {
 
-    public class ResponsePagination<T>
-    {
-        public List<T> Properties { get; set; } = new List<T>();
-        public int CurrentPage { get; set; }
-        public int TotalPages { get; set; }
-        public int PageSize { get; set; }
-        public int TotalCount { get; set; }
-    }
+   
 
 
 
@@ -127,7 +121,7 @@ namespace RealEstateAPI.Controllers
 
                     var response = new ResponsePagination<PropertyGet>
                     {
-                        Properties = properties,
+                        Data = properties,
                         CurrentPage = Page,
                         TotalPages = (int)Math.Ceiling((double)totalCount / pageSize),
                         PageSize = pageSize,
@@ -451,12 +445,10 @@ namespace RealEstateAPI.Controllers
                 existingProperty.Bedrooms = property.Bedrooms != 0 ? property.Bedrooms : existingProperty.Bedrooms;
                 existingProperty.SQFT = property.SQFT ?? existingProperty.SQFT;
                 existingProperty.ParkingSpaces = property.ParkingSpaces != 0 ? property.ParkingSpaces : existingProperty.ParkingSpaces;
-                existingProperty.ListingType = property.ListingType ;
 
-                existingProperty.Status = property.Status;
-
-
-                if (property.Type != null) existingProperty.Type = property.Type.Value;
+                //existingProperty.ListingType = property.ListingType ;
+                //existingProperty.Status = property.Status;
+                //if (property.Type != null) existingProperty.Type = property.Type.Value;
 
 
 
@@ -1111,7 +1103,7 @@ namespace RealEstateAPI.Controllers
         [HttpPost]
         [Route("sale/reset/{id}")]
         [Authorize]
-        public async Task<ActionResult> ResetSaleStatus(int id, [FromBody] SaleResetDTO saleResetDTO)
+        public async Task<ActionResult> ResetSaleStatus(int id, [FromBody] SaleResetPropertyDTO saleResetDTO)
         {
 
             try
@@ -1170,7 +1162,7 @@ namespace RealEstateAPI.Controllers
         [HttpPost]
         [Route("sale/marking-as-process/{id}")]
         [Authorize]
-        public async Task<ActionResult<PropertyGet>> MarkAsProcess(int id, [FromBody] SaleMarkingProcessDTO dto)
+        public async Task<ActionResult<PropertyGet>> MarkAsProcess(int id, [FromBody] SaleMarkingProcessPropertyDTO dto)
         {
             try
             {
