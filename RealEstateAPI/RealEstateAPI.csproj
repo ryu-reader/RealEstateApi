@@ -28,6 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Mapper\User\" />
     <Folder Include="wwwroot\images\features\" />
     <Folder Include="wwwroot\images\properties\" />
     <Folder Include="wwwroot\images\users\" />

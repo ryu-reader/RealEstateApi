@@ -25,7 +25,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy
-            .WithOrigins("http://localhost:5173") 
+            .WithOrigins("http://localhost:5173", "http://adashboard.realestate.com:5173") 
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials(); 
@@ -88,8 +88,12 @@ builder.Services.AddSession(options =>
 builder.Services.AddFido2(options =>
 {
     options.ServerDomain = "localhost";
-    options.ServerName = "RealEstate";
-    options.Origins = new HashSet<string> { "https://localhost:7011", "http://localhost:5173" };
+    options.ServerName = "Estate";
+    options.Origins = new HashSet<string> { 
+        "https://localhost:7011",
+        "http://localhost:5173",
+        "http://adashboard.realestate.com:5173/" 
+    };
 })    
 ;
 

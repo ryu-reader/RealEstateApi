@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RealEstateAPI.DTO;
 using RealEstateAPI.DTO.Properties;
+using RealEstateAPI.Mapper.Properties;
 using RealEstateAPI.Models;
 using RealEstateAPI.Security;
 using System.Security.Claims;
@@ -33,9 +34,152 @@ namespace RealEstateAPI.Controllers
             _env = env;
         }
 
+        private bool ExistProperty(int id)
+        {
+            return _context.Properties.Any(p => p.Id == id);
+        }
+
+
+        private void UpdateImageProperty(Property property, IFormFile image)
+        {
+            try
+            {
+                if (image != null && image.Length > 0)
+                {
+                    // Obtener extensión del archivo original
+                    var extension = Path.GetExtension(image.FileName);
+                    // Generar un nombre único usando GUID
+                    var randomFileName = $"{Guid.NewGuid()}{extension}";
+                    System.IO.Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", property.Id.ToString()));
+                    // Ruta final
+                    var filePath = Path.Combine(
+                        Directory.GetCurrentDirectory(),
+                        "wwwroot",
+                        "images",
+                        "properties",
+                        property.Id.ToString(),
+                        randomFileName
+                    );
+                    // Guardar el archivo
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        image.CopyTo(stream);
+                    }
+                    // Guardar el nombre en la base de datos
+                    var propertyToUpdate = _context.Properties.Find(property.Id);
+                    if (propertyToUpdate != null)
+                    {
+                        propertyToUpdate.Image = randomFileName;
+                        _context.SaveChanges();
+                    }
+                }
+            }
+            catch(Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while updating the property image.");
+            }
+        }
+
+
+        private List<string> UpdateImagesProperty ( List<IFormFile> images, int propertyId)
+        {
+            List<string> ImagesList = new List<string>();
+            try
+            {
+
+                foreach (var image in images)
+                {
+                    // Obtener extensión del archivo original
+                    var extension = Path.GetExtension(image.FileName);
+                    // Generar un nombre único usando GUID
+                    var randomFileName = $"{Guid.NewGuid()}{extension}";
+                    // Ruta final
+                    var filePath = Path.Combine(
+                        Directory.GetCurrentDirectory(),
+                        "wwwroot",
+                        "images",
+                        "properties",
+                        propertyId.ToString(),
+                        randomFileName
+                    );
+                    // Guardar el archivo
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        image.CopyTo(stream);
+                    }
+                    ImagesList.Add(randomFileName);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while updating the property images.");
+            }
+            return ImagesList;
+        }
+
+
+        private void DeleteImageFile(int id, string Filename) {
+
+            try
+            {
+                string folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", id.ToString());
+
+                if (System.IO.Directory.Exists(folderPath))
+                {
+
+                    string file = Path.Combine(folderPath, Filename);
+
+                    var existingImagePath = Path.Combine(folderPath, Filename);
+                    if (System.IO.File.Exists(existingImagePath))
+                    {
+                        System.IO.File.Delete(existingImagePath);
+                    }
+
+                }
+
+
+            }
+            catch(Exception ex) {
+                Console.WriteLine(ex.Message);
+            }
+        
+        }
+
+
+        private void UpdateProperty(int id, PropertyEditRequestDto property)
+        {
+            try
+            {
+                var existingProperty = _context.Properties.Find(id);
+                if (existingProperty != null)
+                {
+                    existingProperty.Name = property.Name;
+                    existingProperty.Code = property.Code;
+                    existingProperty.Description = property.Description;
+                    existingProperty.Price = property.Price;
+                    existingProperty.Currency = property.Currency;
+                    existingProperty.Location = property.Location;
+                    existingProperty.City = property.City;
+                    existingProperty.State = property.State;
+                    existingProperty.Country = property.Country;
+                    existingProperty.Latitude = property.Latitude;
+                    existingProperty.Longitude = property.Longitude;
+                    existingProperty.Bathrooms = property.Bathrooms;
+                    existingProperty.Bedrooms = property.Bedrooms;
+                    existingProperty.SQFT = property.SQFT;
+                    existingProperty.ParkingSpaces = property.ParkingSpaces;
+                    _context.SaveChanges();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.Message);
+            }
+        }
+        
 
         [HttpGet]
-        public async Task<ActionResult<List<PropertyGet>>> Get(int Page = 1,
+        public async Task<ActionResult<List<PropertyResponseDto>>> Get(int Page = 1,
             int PageSize = 10,
             string? Name = null,
             string? Code = null,
@@ -82,44 +226,11 @@ namespace RealEstateAPI.Controllers
                     .Skip((Page - 1) * pageSize)
                     .Take(pageSize)
                     .OrderByDescending(p => p.CreatedAt)
-                    .Select(p => new PropertyGet
-                    {
-                        Id = p.Id,
-                        Name = p.Name,
-                        Code = p.Code,
-                        Description = p.Description,
-                        Price = p.Price,
-                        Currency = p.Currency,
-                        Location = p.Location,
-                        City = p.City,
-                        State = p.State,
-                        Country = p.Country,
-                        Latitude = p.Latitude,
-                        Longitude = p.Longitude,
-                        Bathrooms = p.Bathrooms,
-                        Bedrooms = p.Bedrooms,
-                        SQFT = p.SQFT,
-                        ParkingSpaces = p.ParkingSpaces,
-                        Owner = p.Owner,
-                        ListingType = p.ListingType,
-                        Type = p.Type,
-                        Image = p.Image,
-                        Images = p.Images,
-                        Created = p.CreatedBy != null ? p.CreatedBy.Id : 0,
-                        CreatedAt = p.CreatedAt,
-                        UpdatedAt = p.UpdatedAt,
-                        Status = p.Status,
-                        Features = p.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
-                        {
-                            Feature = f.Feature,
-                            Value = f.Value
-                        }).ToList()
-
-                    })
+                    .Select(p => PropertyMapper.ToResponseDto(p))
                     .ToListAsync();
 
 
-                    var response = new ResponsePagination<PropertyGet>
+                    var response = new ResponsePagination<PropertyResponseDto>
                     {
                         Data = properties,
                         CurrentPage = Page,
@@ -140,11 +251,14 @@ namespace RealEstateAPI.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<PropertyGet>> GetById(int id)
+        public async Task<ActionResult<PropertyResponseDto>> GetById(int id)
         {
             try
             {
-                var property = await _context.Properties.Include(p => p.PropertyFeatures)
+                var property = await _context.Properties
+                    .Include(c => c.CreatedBy)
+                    .Include(o => o.Owner)
+                    .Include(p => p.PropertyFeatures)
                     .ThenInclude(e => e.Feature)
                     .FirstOrDefaultAsync(p => p.Id == id);
                 if (property == null)
@@ -152,49 +266,9 @@ namespace RealEstateAPI.Controllers
                     return NotFound(new { message = $"Property with ID {id} not found." });
                 }
 
-                var PropertyWithCreator = await _context.Properties
-                    .Include(p => p.CreatedBy)
-                    .ThenInclude(u => u.Role)
-                    .FirstOrDefaultAsync(p => p.Id == id);
+                var PropertyResponse = PropertyMapper.ToResponseDto(property);
 
-
-                if(PropertyWithCreator == null) return NotFound(new { message = $"Property with ID {id} not found." });
-
-                var PropertyGet = new PropertyGet
-                {
-                    Id = PropertyWithCreator.Id,
-                    Name = PropertyWithCreator.Name,
-                    Code = PropertyWithCreator.Code,
-                    Description = PropertyWithCreator.Description,
-                    Price = PropertyWithCreator.Price,
-                    Currency = PropertyWithCreator.Currency,
-                    Location = PropertyWithCreator.Location,
-                    City = PropertyWithCreator.City,
-                    State = PropertyWithCreator.State,
-                    Country = PropertyWithCreator.Country,
-                    Latitude = PropertyWithCreator.Latitude,
-                    Longitude = PropertyWithCreator.Longitude
-                    ,Bathrooms = PropertyWithCreator.Bathrooms,
-                    Bedrooms = PropertyWithCreator.Bedrooms,
-                    SQFT = PropertyWithCreator.SQFT,
-                    ParkingSpaces = PropertyWithCreator.ParkingSpaces,
-                    Type = PropertyWithCreator.Type,
-                    ListingType = PropertyWithCreator.ListingType,
-                    Image = PropertyWithCreator.Image,
-                    Images = PropertyWithCreator.Images,
-                    Created = PropertyWithCreator.CreatedBy != null ? PropertyWithCreator.CreatedBy.Id : 0,
-                    CreatedAt = PropertyWithCreator.CreatedAt,
-                    UpdatedAt = PropertyWithCreator.UpdatedAt,
-                    Status = PropertyWithCreator.Status,
-                    Features = PropertyWithCreator.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
-                    {
-                        Feature = f.Feature,
-                        Value = f.Value
-                    }).ToList()
-                };
-
-
-                return PropertyGet;
+                return PropertyResponse;
             }
             catch (Exception ex)
             {
@@ -208,23 +282,17 @@ namespace RealEstateAPI.Controllers
 
         [HttpPost]
         [Authorize]
-        public async Task<ActionResult<PropertyGet>> Create([FromForm] PropertyAddDto property)
+        public async Task<ActionResult<PropertyResponseDto>> Create([FromForm] PropertyRequestDto property)
         {
             try
             {
+                if (property == null) return BadRequest(new { message = "Property data is required." });
 
                 var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-      
-
                 var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.ADD_PROPERTY);
-
-                if (!permission)
-                {
-                    return StatusCode(403, new { message = "You do not have permission to add properties." });
-                }
-
-
+                if (!permission) return StatusCode(403, new { message = "You do not have permission to add properties." });
+               
                 var existingProperty = await _context.Properties.FirstOrDefaultAsync(p => p.Code == property.Code);
 
                 if(existingProperty != null)
@@ -232,84 +300,22 @@ namespace RealEstateAPI.Controllers
                     return Conflict(new { message = $"A property with code '{property.Code}' already exists." });
                 }
 
-                if (property == null)
-                {
-                    return BadRequest(new { message = "Property data is required." });
-                }
-
-               
-
+     
                 var CreatedByUser = await _context.Users.FindAsync(Convert.ToInt32(userId));
 
-                if(CreatedByUser == null)
-                {
-                    return StatusCode(403, new { message = "User not found." });
-                }
-
-                var newProperty = new Property
-                {
-                    Name = property.Name,
-                    Code = property.Code,
-                    Description = property.Description,
-                    Bathrooms = property.Bathrooms,
-                    Bedrooms = property.Bedrooms,
-                    ParkingSpaces = property.ParkingSpaces,
-                    SQFT = property.SQFT,
-                    Price = property.Price,
-                    Currency = property.Currency,
-                    Location = property.Location,
-                    City = property.City,
-                    State = property.State,
-                    Country = property.Country,
-                    Latitude = property.Latitude,
-                    Longitude = property.Longitude,
-                    Type = property.Type,
-                    CreatedBy = CreatedByUser,
-                    ListingType = property.ListingType,
-                    Status = PropertyStatus.Available
-                };
-
+                if(CreatedByUser == null) return StatusCode(403, new { message = "User not found." });
                 
 
+                var newProperty = PropertyMapper.ToEntity(property);
+
+                newProperty.CreatedBy = CreatedByUser;
+                newProperty.Status = PropertyStatus.Available;
                 _context.Properties.Add(newProperty);
                 await _context.SaveChangesAsync();
 
 
-                if (property.Image != null && property.Image.Length > 0)
-                {
-                    // Obtener extensión del archivo original
-                    var extension = Path.GetExtension(property.Image.FileName);
+                if (property.Image != null && property.Image.Length > 0) UpdateImageProperty(newProperty, property.Image);
 
-                    // Generar un nombre único usando GUID
-                    var randomFileName = $"{Guid.NewGuid()}{extension}";
-
-                    System.IO.Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", newProperty.Id.ToString()));
-
-                    // Ruta final
-                    var filePath = Path.Combine(
-                        Directory.GetCurrentDirectory(),
-                        "wwwroot",
-                        "images",
-                        "properties",
-                        newProperty.Id.ToString(),
-                        randomFileName
-                    );
-
-                    // Guardar el archivo
-                    using (var stream = new FileStream(filePath, FileMode.Create))
-                    {
-                        await property.Image.CopyToAsync(stream);
-                    }
-
-                    // Guardar el nombre en la base de datos
-
-                    var propertyToUpdate = await _context.Properties.FindAsync(newProperty.Id);
-                    if (propertyToUpdate != null)
-                    {
-                        propertyToUpdate.Image = randomFileName;
-                        await _context.SaveChangesAsync();
-                    }
-                }
 
                 var readProperty = await _context.Properties
                     .Include(p => p.CreatedBy)
@@ -321,42 +327,9 @@ namespace RealEstateAPI.Controllers
                     return NotFound(new { message = $"Property with ID {newProperty.Id} not found after creation." });
                 }
 
-                var PropertyGet = new PropertyGet
-                {
-                    Id = readProperty.Id,
-                    Name = readProperty.Name,
-                    Code = readProperty.Code,
-                    Description = readProperty.Description,
-                    Price = readProperty.Price,
-                    Currency = readProperty.Currency,
-                    Location = readProperty.Location,
-                    City = readProperty.City,
-                    State = readProperty.State,
-                    Country = readProperty.Country,
-                    Latitude = readProperty.Latitude,
-                    Longitude = readProperty.Longitude,
-                    Bathrooms = readProperty.Bathrooms,
-                    Bedrooms = readProperty.Bedrooms,
-                    SQFT = readProperty.SQFT,
-                    ParkingSpaces = readProperty.ParkingSpaces,
-                    ListingType = readProperty.ListingType,
-                    Status = readProperty.Status,
-                    Type = readProperty.Type,
-                    Image = readProperty.Image,
-                    Images = readProperty.Images,
-                    Created = readProperty.CreatedBy != null ? readProperty.CreatedBy.Id : 0,
-                    CreatedAt = readProperty.CreatedAt,
-                    UpdatedAt = readProperty.UpdatedAt,
-                    
-                    Features = readProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
-                    {
-                        Feature = f.Feature,
-                        Value = f.Value
-                    }).ToList()
-                };
+                var propertyResponse = PropertyMapper.ToResponseDto(readProperty);
 
-                return CreatedAtAction(nameof(GetById), new { id = PropertyGet.Id }, PropertyGet);
-
+                return CreatedAtAction(nameof(GetById), new { id = propertyResponse.Id }, propertyResponse);
 
             }
             catch (Exception ex)
@@ -370,7 +343,7 @@ namespace RealEstateAPI.Controllers
 
         [HttpPut("{id}")]
         [Authorize]
-        public async Task<ActionResult<PropertyGet>> Update(int id, [FromForm] PropertyUpdateDto property)
+        public async Task<ActionResult<PropertyResponseDto>> Update(int id, [FromForm] PropertyEditRequestDto property)
         {
             try
             {
@@ -380,126 +353,63 @@ namespace RealEstateAPI.Controllers
                 var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.EDIT_PROPERTY);
 
                 if (!permission)
-                {
                     return StatusCode(403, new { message = "You do not have permission to edit properties." });
-                }
+                
+
+             
+                var existingProperty = await _context.Properties
+                    .Include(c => c.CreatedBy)
+                    .FirstOrDefaultAsync(w => w.Id ==  id);
 
 
-                var existingProperty = await _context.Properties.FindAsync(id);
-                if (existingProperty == null)
-                {
+                if (existingProperty == null) 
                     return NotFound(new { message = $"Property with ID {id} not found." });
+
+
+
+                if(existingProperty.ListingType == ListingType.Sale && existingProperty.Status == PropertyStatus.Sold)
+                {
+                    return Conflict(new { message = $"Property with ID {id} sold, Date sold: {existingProperty.UpdatedAt.ToString()}" });
                 }
+                
 
 
                 //Extra Verification to avoid duplicate code when updating
                 var existingPropertyWithSameCode = await _context.Properties.FirstOrDefaultAsync(p => p.Code == property.Code && p.Id != id);
-                if (existingPropertyWithSameCode != null)
-                {
+                if (existingPropertyWithSameCode != null) 
                     return Conflict(new { message = $"A property with code '{property.Code}' already exists." });
-                }
 
-                var HasCreated = _context.Properties.
-                    Include(p => p.CreatedBy)
-                    .ThenInclude(u => u.Role)
-                    .FirstOrDefault(p => p.Id == id);
 
 
                 var MyUser = await _context.Users.FindAsync(Convert.ToInt32(userId));
 
                 if(MyUser == null)
-                {
                     return StatusCode(403, new { message = "User not found." });
+
+
+                bool CanEdit = false;
+
+
+                if(existingProperty.CreatedBy != null)
+                {
+                    CanEdit = _userPermission.HasSuperiorRoleTo(Convert.ToInt32(userId), existingProperty.CreatedBy.Id);
                 }
 
-                bool CanEdit = HasCreated != null && HasCreated.CreatedBy != null && HasCreated.CreatedBy.Id != Convert.ToInt32(userId) && !_userPermission.VerifiedRoleLevel(MyUser.Id, HasCreated.CreatedBy.Role.Level);
 
-
-                if (CanEdit)
-                {
+                if (!CanEdit)
                     return StatusCode(403, new { message = "You can`t edit this property" });
-                }
+                
 
-
-
-                existingProperty.Name = property.Name ?? existingProperty.Name;
-
-                existingProperty.Code = property.Code ?? existingProperty.Code;
-
-                existingProperty.Description = property.Description ?? existingProperty.Description;
-
-                if (property.Price != 0)
-                {
-                    existingProperty.Price = property.Price;
-                }
-
-                existingProperty.Currency = property.Currency ?? existingProperty.Currency;
-                existingProperty.Location = property.Location ?? existingProperty.Location;
-                existingProperty.City = property.City ?? existingProperty.City;
-                existingProperty.State = property.State ?? existingProperty.State;
-                existingProperty.Country = property.Country ?? existingProperty.Country;
-                existingProperty.Latitude = property.Latitude ?? existingProperty.Latitude;
-                existingProperty.Longitude = property.Longitude ?? existingProperty.Longitude;
-                existingProperty.UpdatedAt = DateTime.UtcNow;
-                existingProperty .Bathrooms = property.Bathrooms != 0 ? property.Bathrooms : existingProperty.Bathrooms;
-                existingProperty.Bedrooms = property.Bedrooms != 0 ? property.Bedrooms : existingProperty.Bedrooms;
-                existingProperty.SQFT = property.SQFT ?? existingProperty.SQFT;
-                existingProperty.ParkingSpaces = property.ParkingSpaces != 0 ? property.ParkingSpaces : existingProperty.ParkingSpaces;
-
-                //existingProperty.ListingType = property.ListingType ;
-                //existingProperty.Status = property.Status;
-                //if (property.Type != null) existingProperty.Type = property.Type.Value;
-
+                UpdateProperty(id, property);
 
 
                 //Update Image
-                if (property.Image != null && property.Image.Length > 0)
+                if (property.Image != null && !string.IsNullOrEmpty(existingProperty.Image) && property.Image.Length > 0)
                 {
-                    // Obtener extensión del archivo original
-                    var extension = Path.GetExtension(property.Image.FileName);
-
-                    // Generar un nombre único usando GUID
-                    var randomFileName = $"{Guid.NewGuid()}{extension}";
-
-
-                    string folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", existingProperty.Id.ToString());
-                    string pathToExistingImage = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", existingProperty.Id.ToString(), existingProperty.Image ?? "");
-
-                    if (Directory.Exists(folderPath) && System.IO.File.Exists(pathToExistingImage) && !String.IsNullOrEmpty(existingProperty.Image))
-                    {
-                        System.IO.File.Delete(pathToExistingImage);
-                    }
-
-                    if (!Directory.Exists(folderPath))
-                    {
-                        System.IO.Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", existingProperty.Id.ToString()));
-                    }
-
-                    // Ruta final
-                    var filePath = Path.Combine(
-                        Directory.GetCurrentDirectory(),
-                        "wwwroot",
-                        "images",
-                        "properties",
-                        existingProperty.Id.ToString(),
-                        randomFileName
-                    );
-
-                    // Guardar el archivo
-                    using (var stream = new FileStream(filePath, FileMode.Create))
-                    {
-                        await property.Image.CopyToAsync(stream);
-                    }
-
-                    // Guardar el nombre en la base de datos
-
-                    var propertyToUpdate = await _context.Properties.FindAsync(existingProperty.Id);
-                    if (propertyToUpdate != null)
-                    {
-                        propertyToUpdate.Image = randomFileName;
-                        await _context.SaveChangesAsync();
-                    }
+                    DeleteImageFile(id, existingProperty.Image);
+                    UpdateImageProperty(existingProperty, property.Image);
                 }
+
 
                 var updatedProperty = await _context.Properties
                     .Include(p => p.CreatedBy)
@@ -508,40 +418,7 @@ namespace RealEstateAPI.Controllers
 
                 if(updatedProperty == null) return NotFound(new { message = $"Property with ID {existingProperty.Id} not found after update." });
 
-                var PropertyGet = new PropertyGet
-                    {
-                        Id = updatedProperty.Id,
-                        Name = updatedProperty.Name,
-                        Code = updatedProperty.Code,
-                        Description = updatedProperty.Description,
-                        Price = updatedProperty.Price,
-                        Currency = updatedProperty.Currency,
-                        Location = updatedProperty.Location,
-                        City = updatedProperty.City,
-                        State = updatedProperty.State,
-                        Country = updatedProperty.Country,
-                        Latitude = updatedProperty.Latitude,
-                        Longitude = updatedProperty.Longitude,
-                        Bathrooms = updatedProperty.Bathrooms,
-                        Bedrooms = updatedProperty.Bedrooms,
-                        SQFT = updatedProperty.SQFT,
-                        ParkingSpaces = updatedProperty.ParkingSpaces,
-                        ListingType = updatedProperty.ListingType,
-                        Type = updatedProperty.Type,
-                        Image = updatedProperty.Image,
-                        Images = updatedProperty.Images,
-                        Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
-                        CreatedAt = updatedProperty.CreatedAt,
-                        UpdatedAt = updatedProperty.UpdatedAt,
-                        Status = updatedProperty.Status,
-                        Features = updatedProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
-                        {
-                            Feature = f.Feature,
-                            Value = f.Value
-                        }).ToList()
-                };
-
-
+                var PropertyGet = PropertyMapper.ToResponseDto(updatedProperty);
 
 
                 await _context.SaveChangesAsync();
@@ -559,7 +436,7 @@ namespace RealEstateAPI.Controllers
         [HttpPut]
         [Route("update-images/{id}")]
         [Authorize]
-        public async Task<ActionResult<PropertyGet>> UpdateImages(int id, [FromForm] List<IFormFile>  Images)
+        public async Task<ActionResult<PropertyResponseDto>> UpdateImages(int id, [FromForm] List<IFormFile>  Images)
         {
             try
             {
@@ -567,18 +444,14 @@ namespace RealEstateAPI.Controllers
 
                 var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.EDIT_PROPERTY);
 
-                if (!permission)
-                {
-                    return StatusCode(403, new { message = "You do not have permission to edit properties." });
-                }
+                if (!permission) return StatusCode(403, new { message = "You do not have permission to edit properties." });
+                
 
                 var existingProperty = await _context.Properties
                     .FindAsync(id);
 
-                if(existingProperty == null)
-                {
-                    return NotFound(new { message = $"Property with ID {id} not found." });
-                }
+                if(existingProperty == null) return NotFound(new { message = $"Property with ID {id} not found." });
+                
 
                 string folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", existingProperty.Id.ToString());
 
@@ -605,38 +478,7 @@ namespace RealEstateAPI.Controllers
 
                 List<string> ImagesList = new List<string>();
 
-                foreach (var image in Images)
-                {
-
-                    // Obtener extensión del archivo original
-                    var extension = Path.GetExtension(image.FileName);
-
-                    // Generar un nombre único usando GUID
-                    var randomFileName = $"{Guid.NewGuid()}{extension}";
-
-
-                   
-
-
-                    // Ruta final
-                    var filePath = Path.Combine(
-                        Directory.GetCurrentDirectory(),
-                        "wwwroot",
-                        "images",
-                        "properties",
-                        existingProperty.Id.ToString(),
-                        randomFileName
-                    );
-
-                    // Guardar el archivo
-                    using (var stream = new FileStream(filePath, FileMode.Create))
-                    {
-                        await image.CopyToAsync(stream);
-                    }
-
-                    ImagesList.Add(randomFileName);
-
-                }
+                ImagesList = UpdateImagesProperty(Images, existingProperty.Id);
 
 
                 existingProperty.Images.AddRange(ImagesList);
@@ -649,41 +491,10 @@ namespace RealEstateAPI.Controllers
                     return NotFound(new { message = $"Property with ID {id} not found after updating images." });
                 }
 
-                var PropertyGet = new PropertyGet
-                {
-                    Id = updatedProperty.Id,
-                    Name = updatedProperty.Name,
-                    Code = updatedProperty.Code,
-                    Description = updatedProperty.Description,
-                    Price = updatedProperty.Price,
-                    Currency = updatedProperty.Currency,
-                    Location = updatedProperty.Location,
-                    City = updatedProperty.City,
-                    State = updatedProperty.State,
-                    Country = updatedProperty.Country,
-                    Latitude = updatedProperty.Latitude,
-                    Longitude = updatedProperty.Longitude,
-                    Bathrooms = updatedProperty.Bathrooms,
-                    Bedrooms = updatedProperty.Bedrooms,
-                    SQFT = updatedProperty.SQFT,
-                    ListingType = updatedProperty.ListingType,
-                    ParkingSpaces = updatedProperty.ParkingSpaces,
-                    Type = updatedProperty.Type,
-                    Image = updatedProperty.Image,
-                    Images = updatedProperty.Images,
-                    Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
-                    CreatedAt = updatedProperty.CreatedAt,
-                    UpdatedAt = updatedProperty.UpdatedAt,
-                    Status = updatedProperty.Status,
-                    Features = updatedProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
-                    {
-                        Feature = f.Feature,
-                        Value = f.Value
-                    }).ToList()
-                };
+                var response = PropertyMapper.ToResponseDto(updatedProperty);
 
 
-                return Ok(PropertyGet);
+                return Ok(response);
 
             }
             catch (Exception ex)
@@ -695,99 +506,12 @@ namespace RealEstateAPI.Controllers
             }
         }
 
-        [HttpPost]
-        [Route("update-images-position/{id}")]
-        [Authorize]
-        public async Task<ActionResult<PropertyGet>> UpdatePositionImages(int id, int oldIndex, int newIndex)
-        {
-            try
-            {
-
-                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-                var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.EDIT_PROPERTY);
-
-                if (!permission)
-                {
-                    return StatusCode(403, new { message = "You do not have permission to edit properties." });
-                }
-
-
-                if (oldIndex == newIndex)
-                {
-                    return BadRequest(new { message = "Old index and new index cannot be the same." });
-                }
-
-                
-
-                var existingProperty = await _context.Properties
-                    .FindAsync(id);
-                if (existingProperty == null)
-                {
-                    return NotFound(new { message = $"Property with ID {id} not found." });
-                }
-                if (oldIndex < 0 || oldIndex >= existingProperty.Images.Count || newIndex < 0 || newIndex >= existingProperty.Images.Count)
-                {
-                    return BadRequest(new { message = "Invalid image indices." });
-                }
-                var imageToMove = existingProperty.Images[oldIndex];
-                existingProperty.Images.RemoveAt(oldIndex);
-                existingProperty.Images.Insert(newIndex, imageToMove);
-                _context.SaveChanges();
-                var updatedProperty = await _context.Properties.FindAsync(id);
-
-                if(updatedProperty == null) return NotFound(new { message = $"Property with ID {id} not found after updating images." });
-
-
-                var PropertyGet = new PropertyGet
-                {
-                    Id = updatedProperty.Id,
-                    Name = updatedProperty.Name,
-                    Code = updatedProperty.Code,
-                    Description = updatedProperty.Description,
-                    Price = updatedProperty.Price,
-                    Currency = updatedProperty.Currency,
-                    Location = updatedProperty.Location,
-                    City = updatedProperty.City,
-                    State = updatedProperty.State,
-                    Country = updatedProperty.Country,
-                    Latitude = updatedProperty.Latitude,
-                    Longitude = updatedProperty.Longitude,
-                    Bathrooms = updatedProperty.Bathrooms,
-                    Bedrooms = updatedProperty.Bedrooms,
-                    SQFT = updatedProperty.SQFT,
-                    ParkingSpaces = updatedProperty.ParkingSpaces,
-                    ListingType = updatedProperty.ListingType,
-                    Type = updatedProperty.Type,
-                    Image = updatedProperty.Image,
-                    Images = updatedProperty.Images,
-                    Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
-                    CreatedAt = updatedProperty.CreatedAt,
-                    UpdatedAt = updatedProperty.UpdatedAt,
-                    Status = updatedProperty.Status,
-                    Features = updatedProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
-                    {
-                        Feature = f.Feature,
-                        Value = f.Value
-                    }).ToList()
-                };
-
-
-                return Ok(PropertyGet);
-            }
-            catch (Exception ex)
-            {
-                return Problem(
-                    detail: "An error occurred while updating the property images. Please try again later. " + ex.Message,
-                    statusCode: 500
-                );
-            }
-        }
+        
 
         [HttpPost]
         [Route("update-features/{id}")]
         [Authorize]
-        public async Task<ActionResult<PropertyGet>> UpdateFeatures(int id, [FromBody] List<PropertyFeatureAddDto> features)
+        public async Task<ActionResult<PropertyResponseDto>> UpdateFeatures(int id, [FromBody] List<PropertyFeatureAddDto> features)
         {
             try
             {
@@ -843,40 +567,10 @@ namespace RealEstateAPI.Controllers
 
                 if(updatedProperty == null) return NotFound(new { message = $"Property with ID {id} not found after updating features." });
 
-                var PropertyGet = new PropertyGet
-                {
-                    Id = updatedProperty.Id,
-                    Name = updatedProperty.Name,
-                    Code = updatedProperty.Code,
-                    Description = updatedProperty.Description,
-                    Price = updatedProperty.Price,
-                    Currency = updatedProperty.Currency,
-                    Location = updatedProperty.Location,
-                    City = updatedProperty.City,
-                    State = updatedProperty.State,
-                    Country = updatedProperty.Country,
-                    Latitude = updatedProperty.Latitude,
-                    Longitude = updatedProperty.Longitude,
-                    Bathrooms = updatedProperty.Bathrooms,
-                    Bedrooms = updatedProperty.Bedrooms,
-                    SQFT = updatedProperty.SQFT,
-                    ParkingSpaces = updatedProperty.ParkingSpaces,
-                    Type = updatedProperty.Type,
-                    ListingType = updatedProperty.ListingType,
-                    Image = updatedProperty.Image,
-                    Images = updatedProperty.Images,
-                    Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
-                    CreatedAt = updatedProperty.CreatedAt,
-                    UpdatedAt = updatedProperty.UpdatedAt,
-                    Status = updatedProperty.Status,
-                    Features = updatedProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
-                    {
-                        Feature = f.Feature,
-                        Value = f.Value
-                    }).ToList()
-                };
+                var response = PropertyMapper.ToResponseDto(updatedProperty);
 
-                return Ok(PropertyGet);
+
+                return Ok(response);
 
 
             }
@@ -884,88 +578,6 @@ namespace RealEstateAPI.Controllers
             {
                 return Problem(
                     detail: "An error occurred while updating the property features. Please try again later. " + ex.Message,
-                    statusCode: 500
-                );
-            }
-        }
-
-
-        [HttpDelete]
-        [Route("delete-image/{id}/{imageIndex}")]
-        [Authorize]
-        public async Task<ActionResult<PropertyGet>> DeleteImage(int id, int imageIndex)
-        {
-            try
-            {
-                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-                var permission = _userPermission.HasPermission(Convert.ToInt32(userId), PermissionType.EDIT_PROPERTY);
-                if (!permission)
-                {
-                    return StatusCode(403, new { message = "You do not have permission to edit properties." });
-                }
-                var existingProperty = await _context.Properties
-                    .FindAsync(id);
-                if (existingProperty == null)
-                {
-                    return NotFound(new { message = $"Property with ID {id} not found." });
-                }
-                if (imageIndex < 0 || imageIndex >= existingProperty.Images.Count)
-                {
-                    return BadRequest(new { message = "Invalid image index." });
-                }
-                var imageToDelete = existingProperty.Images[imageIndex];
-                string pathToExistingImage = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "properties", existingProperty.Id.ToString(), imageToDelete);
-                if (System.IO.File.Exists(pathToExistingImage))
-                {
-                    System.IO.File.Delete(pathToExistingImage);
-                }
-                existingProperty.Images.RemoveAt(imageIndex);
-                _context.SaveChanges();
-                var updatedProperty = await _context.Properties.FindAsync(id);
-
-                if(updatedProperty == null) return NotFound(new { message = $"Property with ID {id} not found after deleting image." });
-
-                var PropertyGet = new PropertyGet
-                {
-                    Id = updatedProperty.Id,
-                    Name = updatedProperty.Name,
-                    Code = updatedProperty.Code,
-                    Description = updatedProperty.Description,
-                    Price = updatedProperty.Price,
-                    Currency = updatedProperty.Currency,
-                    Location = updatedProperty.Location,
-                    City = updatedProperty.City,
-                    State = updatedProperty.State,
-                    Country = updatedProperty.Country,
-                    Latitude = updatedProperty.Latitude,
-                    Longitude = updatedProperty.Longitude,
-                    Bathrooms = updatedProperty.Bathrooms,
-                    Bedrooms = updatedProperty.Bedrooms,
-                    SQFT = updatedProperty.SQFT,
-                    ParkingSpaces = updatedProperty.ParkingSpaces,
-                    ListingType = updatedProperty.ListingType,
-                    Type = updatedProperty.Type,
-                    Image = updatedProperty.Image,
-                    Images = updatedProperty.Images,
-                    Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
-                    CreatedAt = updatedProperty.CreatedAt,
-                    UpdatedAt = updatedProperty.UpdatedAt,
-                    Status = updatedProperty.Status,
-                    Features = updatedProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
-                    {
-                        Feature = f.Feature,
-                        Value = f.Value
-                    }).ToList()
-
-                };
-
-
-                return Ok(PropertyGet);
-            }
-            catch (Exception ex)
-            {
-                return Problem(
-                    detail: "An error occurred while deleting the property image. Please try again later. " + ex.Message,
                     statusCode: 500
                 );
             }
@@ -1035,7 +647,7 @@ namespace RealEstateAPI.Controllers
         [HttpPost]
         [Route("mark-as-pending/{id}")]
         [Authorize]
-        public async Task<ActionResult<PropertyGet>> MarkAsPending(int id)
+        public async Task<ActionResult<PropertyResponseDto>> MarkAsPending(int id)
         {
             try
             {
@@ -1057,40 +669,11 @@ namespace RealEstateAPI.Controllers
                     .Include(p => p.Owner)
                     .FirstOrDefaultAsync(p => p.Id == id);
                 if(updatedProperty == null) return NotFound(new { message = $"Property with ID {id} not found after marking as pending." });
-                var PropertyGet = new PropertyGet
-                {
-                    Id = updatedProperty.Id,
-                    Name = updatedProperty.Name,
-                    Code = updatedProperty.Code,
-                    Description = updatedProperty.Description,
-                    Price = updatedProperty.Price,
-                    Currency = updatedProperty.Currency,
-                    Location = updatedProperty.Location,
-                    City = updatedProperty.City,
-                    State = updatedProperty.State,
-                    Country = updatedProperty.Country,
-                    Latitude = updatedProperty.Latitude,
-                    Longitude = updatedProperty.Longitude,
-                    Bathrooms = updatedProperty.Bathrooms,
-                    Bedrooms = updatedProperty.Bedrooms,
-                    SQFT = updatedProperty.SQFT,
-                    ParkingSpaces = updatedProperty.ParkingSpaces,
-                    ListingType = updatedProperty.ListingType,
-                    Type = updatedProperty.Type,
-                    Image = updatedProperty.Image,
-                    Images = updatedProperty.Images,
-                    Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
-                    CreatedAt = updatedProperty.CreatedAt,
-                    UpdatedAt = updatedProperty.UpdatedAt,
-                    Owner = updatedProperty.Owner,
-                    Status = updatedProperty.Status,
-                    Features = updatedProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
-                    {
-                        Feature = f.Feature,
-                        Value = f.Value
-                    }).ToList()
-                };
-                return Ok(PropertyGet);
+
+
+                var response = PropertyMapper.ToResponseDto(updatedProperty);
+
+                return Ok(response);
             }
             catch (Exception ex)
             {
@@ -1103,7 +686,7 @@ namespace RealEstateAPI.Controllers
         [HttpPost]
         [Route("sale/reset/{id}")]
         [Authorize]
-        public async Task<ActionResult> ResetSaleStatus(int id, [FromBody] SaleResetPropertyDTO saleResetDTO)
+        public async Task<ActionResult> ResetSaleStatus(int id, [FromBody] SaleResetPropertyDto saleResetDTO)
         {
 
             try
@@ -1117,25 +700,38 @@ namespace RealEstateAPI.Controllers
                     return StatusCode(403, new { message = "You do not have permission to edit properties." });
                 }
 
-                var existingProperty = await _context.Properties.FindAsync(id);
-
+                var existingProperty = await _context.Properties.Where(e => e.Id == id)
+                    .Include(o => o.Owner)
+                    .FirstOrDefaultAsync();
+                    
                 if (existingProperty == null)
                 {
                     return NotFound(new { message = $"Property with ID {id} not found." });
                 }
 
 
-                var countOfPropertiesWithSameOwner = _context.Properties.Where(x => x.Owner != null && existingProperty.Owner != null && x.Owner.Id == existingProperty.Owner.Id).Count();
+                var currentOwner = existingProperty.Owner;
 
-                if (saleResetDTO.DeleteOwner && existingProperty.Owner != null && countOfPropertiesWithSameOwner <= 1)
+                var countOfPropertiesWithSameOwner = 0;
+
+                if (currentOwner != null)
                 {
-                    _context.Owners.Remove(existingProperty.Owner);
+                    countOfPropertiesWithSameOwner = _context.Properties
+                        .Where(x => x.Owner != null && x.Owner.Id == currentOwner.Id)
+                        .Count();
+                }
+
+                existingProperty.Owner = null;
+
+                if (saleResetDTO.DeleteOwner && currentOwner != null && countOfPropertiesWithSameOwner <= 1)
+                {
+                    _context.Owners.Remove(currentOwner);
                 }
 
 
 
                 existingProperty.Status = PropertyStatus.Available;
-
+                
 
 
                 await _context.SaveChangesAsync();
@@ -1162,7 +758,7 @@ namespace RealEstateAPI.Controllers
         [HttpPost]
         [Route("sale/marking-as-process/{id}")]
         [Authorize]
-        public async Task<ActionResult<PropertyGet>> MarkAsProcess(int id, [FromBody] SaleMarkingProcessPropertyDTO dto)
+        public async Task<ActionResult> MarkAsProcess(int id, [FromBody] SaleMarkingProcessPropertyDto dto)
         {
             try
             {
@@ -1192,45 +788,11 @@ namespace RealEstateAPI.Controllers
                 existingProperty.Owner = owner;
                 existingProperty.Status = PropertyStatus.InProcess;
                 await _context.SaveChangesAsync();
-                var updatedProperty = await _context.Properties
-                    .Include(p => p.CreatedBy)
-                    .Include(p => p.Owner)
-                    .FirstOrDefaultAsync(p => p.Id == id);
-                if(updatedProperty == null) return NotFound(new { message = $"Property with ID {id} not found after marking as in process." });
-                var PropertyGet = new PropertyGet
-                {
-                    Id = updatedProperty.Id,
-                    Name = updatedProperty.Name,
-                    Code = updatedProperty.Code,
-                    Description = updatedProperty.Description,
-                    Price = updatedProperty.Price,
-                    Currency = updatedProperty.Currency,
-                    Location = updatedProperty.Location,
-                    City = updatedProperty.City,
-                    State = updatedProperty.State,
-                    Country = updatedProperty.Country,
-                    Latitude = updatedProperty.Latitude,
-                    Longitude = updatedProperty.Longitude,
-                    Bathrooms = updatedProperty.Bathrooms,
-                    Bedrooms = updatedProperty.Bedrooms,
-                    SQFT = updatedProperty.SQFT,
-                    ParkingSpaces = updatedProperty.ParkingSpaces,
-                    ListingType = updatedProperty.ListingType,
-                    Type = updatedProperty.Type,
-                    Image = updatedProperty.Image,
-                    Images = updatedProperty.Images,
-                    Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
-                    CreatedAt = updatedProperty.CreatedAt,
-                    UpdatedAt = updatedProperty.UpdatedAt,
-                    Owner = updatedProperty.Owner,
-                    Status = updatedProperty.Status,
-                    Features = updatedProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
-                    {
-                        Feature = f.Feature,
-                        Value = f.Value
-                    }).ToList()
-                };
-                return Ok(PropertyGet);
+                
+
+                return Ok();
+
+
             }
             catch (Exception ex)
             {
@@ -1244,7 +806,7 @@ namespace RealEstateAPI.Controllers
         [HttpPost]
         [Route("sale/{id}")]
         [Authorize]
-        public async Task<ActionResult<PropertyGet>> MarkAsSold(int id)
+        public async Task<ActionResult> MarkAsSold(int id)
         {
             try
             {
@@ -1255,8 +817,11 @@ namespace RealEstateAPI.Controllers
                     return StatusCode(403, new { message = "You do not have permission to edit properties." });
                 }
 
-                
-                var existingProperty = await _context.Properties.FindAsync(id);
+                var existingProperty = await _context.Properties
+                    .Include(o => o.Owner)
+                    .Where(w => w.Id == id)
+                    .FirstOrDefaultAsync();
+
                 if (existingProperty == null)
                 {
                     return NotFound(new { message = $"Property with ID {id} not found." });
@@ -1287,13 +852,19 @@ namespace RealEstateAPI.Controllers
                     return StatusCode(403, new { message = "User not found." });
                 }
 
-                bool CanEdit = HasCreated != null && HasCreated.CreatedBy != null && HasCreated.CreatedBy.Id != Convert.ToInt32(userId) && !_userPermission.VerifiedRoleLevel(MyUser.Id, HasCreated.CreatedBy.Role.Level);
+
+                bool CanEdit = false;
 
 
-                if (CanEdit)
+                if (existingProperty.CreatedBy != null)
                 {
-                    return StatusCode(403, new { message = "You can`t edit this property" });
+                    CanEdit = _userPermission.HasSuperiorRoleTo(Convert.ToInt32(userId), existingProperty.CreatedBy.Id);
                 }
+
+
+                if (!CanEdit)
+                    return StatusCode(403, new { message = "You can`t edit this property" });
+
 
 
                if(existingProperty.Owner == null)
@@ -1302,48 +873,11 @@ namespace RealEstateAPI.Controllers
                 }
 
 
-
+               existingProperty.UpdatedAt = DateTime.UtcNow;
                 existingProperty.Status = PropertyStatus.Sold;
                 await _context.SaveChangesAsync();
-                var updatedProperty = await _context.Properties
-                    .Include(p => p.CreatedBy)
-                    .Include(p => p.Owner)
-                    .FirstOrDefaultAsync(p => p.Id == id);
-                if(updatedProperty == null) return NotFound(new { message = $"Property with ID {id} not found after marking as sold." });
-                var PropertyGet = new PropertyGet
-                {
-                    Id = updatedProperty.Id,
-                    Name = updatedProperty.Name,
-                    Code = updatedProperty.Code,
-                    Description = updatedProperty.Description,
-                    Price = updatedProperty.Price,
-                    Currency = updatedProperty.Currency,
-                    Location = updatedProperty.Location,
-                    City = updatedProperty.City,
-                    State = updatedProperty.State,
-                    Country = updatedProperty.Country,
-                    Latitude = updatedProperty.Latitude,
-                    Longitude = updatedProperty.Longitude,
-                    Bathrooms = updatedProperty.Bathrooms,
-                    Bedrooms = updatedProperty.Bedrooms,
-                    SQFT = updatedProperty.SQFT,
-                    ParkingSpaces = updatedProperty.ParkingSpaces,
-                    ListingType = updatedProperty.ListingType,
-                    Type = updatedProperty.Type,
-                    Image = updatedProperty.Image,
-                    Images = updatedProperty.Images,
-                    Created = updatedProperty.CreatedBy != null ? updatedProperty.CreatedBy.Id : 0,
-                    CreatedAt = updatedProperty.CreatedAt,
-                    UpdatedAt = updatedProperty.UpdatedAt,
-                    Owner = updatedProperty.Owner,
-                    Status = updatedProperty.Status,
-                    Features = updatedProperty.PropertyFeatures.Select(f => new PropertyFeatureResponseDto
-                    {
-                        Feature = f.Feature,
-                        Value = f.Value
-                    }).ToList()
-                };
-                return Ok(PropertyGet);
+               
+                return Ok();
             }
             catch (Exception ex)
             {
@@ -1351,7 +885,33 @@ namespace RealEstateAPI.Controllers
                     detail: "An error occurred while marking the property as sold. Please try again later. " + ex.Message
                 );
             }
-        }   
+        }
+
+        [HttpPost]
+        [Authorize]
+        [Route("rent/{id}")]
+        public async Task<ActionResult> RentProperty(int id, [FromBody] PropertyRentRequestDto dto)
+        {
+
+            try
+            {
+
+                var existOwner = _context.Owners.Find(dto.OwnerId);
+                if (existOwner == null) return NotFound();
+
+
+
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+
+                return Problem(detail: "An error occurred: " + ex.Message);
+            }
+
+
+        }
+
 
         // Agrega este método privado en la clase PropertiesController para solucionar CS0103
         private string GetContentTypeImage(string path)

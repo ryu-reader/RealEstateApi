@@ -1,6 +1,6 @@
 ﻿namespace RealEstateAPI.DTO.Properties
 {
-    public class SaleResetPropertyDTO
+    public class SaleResetPropertyDto
     {
 
         public bool DeleteOwner { get; set; } = false;

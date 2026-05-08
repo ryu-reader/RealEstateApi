@@ -1,6 +1,6 @@
 ﻿namespace RealEstateAPI.DTO.Role
 {
-    public class RoleAddRequestDTO
+    public class RoleAddRequestDto
     {
         public string Name { get; set; } = String.Empty;
         public string Description { get; set; } = String.Empty;

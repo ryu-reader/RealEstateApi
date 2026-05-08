@@ -1,6 +1,6 @@
 ﻿namespace RealEstateAPI.DTO.User
 {
-    public class UserResponseDTO
+    public class UserResponseDto
     {
         public string Id { get; set; }
         public string Name { get; set; }

@@ -1,43 +1,9 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using RealEstateAPI.Models;
 
-namespace RealEstateAPI.Models
+namespace RealEstateAPI.DTO.Properties
 {
-
-
-  
-    
-
-    
-
-
-    public enum ListingType
+    public class PropertyResponseDto
     {
-        Sale,
-        Rent
-    }
-
-    public enum PropertyType
-    {
-        Apartment = 0,
-        House = 1,
-        Condo = 2,
-        Townhouse = 3,
-        Land = 4
-    }
-
-    public enum PropertyStatus
-    {
-        Available = 0,
-        Sold = 1,
-        Pending = 2,
-        Rented = 3,
-        InProcess = 4
-    }
-
-
-    public class Property
-    {
-
         public int Id { get; set; }
 
         public string Name { get; set; } = null!;
@@ -78,17 +44,17 @@ namespace RealEstateAPI.Models
 
         public List<string> Images { get; set; } = new();
 
+        public int Created { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public DateTime? UpdatedAt { get; set; } = null;
 
-        public User CreatedBy { get; set; } = null!;
+        public PropertyStatus Status { get; set; }
 
-        public PropertyStatus Status { get; set; } = PropertyStatus.Available;
+        public List<PropertyFeatureResponseDto> Features { get; set; } = new();
 
-        public List<PropertyFeature> PropertyFeatures { get; set; } = new();
-
-        public Owner? Owner { get; set; } = null!;
+        public Models.Owner? Owner { get; set; } = null!;
 
 
     }

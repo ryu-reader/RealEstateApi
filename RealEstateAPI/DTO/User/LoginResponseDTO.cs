@@ -5,13 +5,13 @@ namespace RealEstateAPI.DTO.User
 
    
 
-    public class LoginResponseDTO
+    public class LoginResponseDto
     {
 
     
         public string AccessToken { get; set; } = string.Empty;
         public string RefreshToken { get; set; } = string.Empty;
-        public UserResponseDTO User { get; set; } = null!;
+        public UserResponseDto User { get; set; } = null!;
 
         public List<PermissionType > Permissions { get; set; } = new();
 

@@ -1,6 +1,6 @@
 ﻿namespace RealEstateAPI.DTO.Owner
 {
-    public class OwnerDTO
+    public class OwnerAddRequestDto
     {
 
         public string Name { get; set; }
@@ -14,7 +14,5 @@
         public string Phone { get; set; }
 
         public string Country { get; set; }
-
-
     }
 }

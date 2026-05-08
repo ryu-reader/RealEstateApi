@@ -88,7 +88,7 @@ namespace RealEstateAPI.Controllers
 
         [HttpPost]
         [Authorize]
-        public async Task<ActionResult<Role>> CreateRole([FromBody] RoleAddRequestDTO dTO)
+        public async Task<ActionResult<Role>> CreateRole([FromBody] RoleAddRequestDto dTO)
         {
             try
             {
@@ -135,7 +135,7 @@ namespace RealEstateAPI.Controllers
         [HttpPut]
         [Route("{id}")]
         [Authorize]
-        public async Task<ActionResult<Role>> UpdateRole(int id, [FromBody] RoleEditRequestDTO dTO)
+        public async Task<ActionResult<Role>> UpdateRole(int id, [FromBody] RoleEditRequestDto dTO)
         {
             try
             {

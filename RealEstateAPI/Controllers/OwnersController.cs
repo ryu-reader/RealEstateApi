@@ -22,18 +22,28 @@ namespace RealEstateAPI.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<ResponsePagination<Owner>>> GetOwners(int Page = 1, int PageSize = 10)
+        public async Task<ActionResult<ResponsePagination<Owner>>> GetOwners(int Page = 1, int PageSize = 10, string? Identification = "")
         {
             try
             {
                 var query = _context.Owners.AsQueryable();
 
-                var totalCount = await query.CountAsync();
+                if (!String.IsNullOrEmpty(Identification))
+                {
+                    query = query.Where(x => x.Identification.Contains(Identification));
+                }
+
+
 
                 var owners = await query
                     .Skip((Page - 1) * PageSize)
                     .Take(PageSize)
+                    .OrderByDescending(e => e.Id)
                     .ToListAsync();
+
+
+                var totalCount = await query.CountAsync();
+
 
 
                 var response = new ResponsePagination<Owner>
@@ -81,10 +91,18 @@ namespace RealEstateAPI.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Owner>> CreateOwner([FromBody] OwnerDTO dTO)
+        public async Task<ActionResult<Owner>> CreateOwner([FromBody] OwnerAddRequestDto dTO)
         {
             try
             {
+
+                var exist = await _context.Owners.AnyAsync(o => o.Identification == dTO.Identification);
+
+                if (exist)
+                {
+                    return Conflict(new { Message = $"An owner with the identification {dTO.Identification} already exists." });
+                }
+
                 var owner = new Owner
                 {
                     Name = dTO.Name,
@@ -112,7 +130,7 @@ namespace RealEstateAPI.Controllers
 
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateOwner(int id, [FromBody] OwnerDTO dTO)
+        public async Task<IActionResult> UpdateOwner(int id, [FromBody] OwnerAddRequestDto dTO)
         {
             try
             {

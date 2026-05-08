@@ -83,7 +83,7 @@ namespace RealEstateAPI.Controllers
 
         [HttpGet("me")]
         [Authorize]
-        public async Task<ActionResult<LoginResponseDTO>> GetUserInfo()
+        public async Task<ActionResult<LoginResponseDto>> GetUserInfo()
         {
             // Obtienes info del token
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -109,9 +109,9 @@ namespace RealEstateAPI.Controllers
                         .ToList();
 
 
-            var LoginResponseDTO = new LoginResponseDTO
+            var LoginResponseDto = new LoginResponseDto
             {
-                User = new UserResponseDTO
+                User = new UserResponseDto
                 {
                     Id = MyUser.Id.ToString(),
                     Name = MyUser.Name,
@@ -126,13 +126,13 @@ namespace RealEstateAPI.Controllers
             };
 
 
-            return Ok(LoginResponseDTO);
+            return Ok(LoginResponseDto);
         }
 
 
 
         [HttpPost("login")]
-        public async Task<ActionResult<LoginResponseDTO>> Login([FromBody] LoginRequestDto dto)
+        public async Task<ActionResult<LoginResponseDto>> Login([FromBody] LoginRequestDto dto)
         {
             var user = await _context.Users
                         .Include(u => u.Role)
@@ -165,11 +165,11 @@ namespace RealEstateAPI.Controllers
             AppendTokenCookie(accessToken, 15);
             AppendRefreshTokenCookie(refreshToken, 7);
 
-            var LoginResponseDTO = new LoginResponseDTO
+            var LoginResponseDTO = new LoginResponseDto
             {
                 AccessToken = accessToken,
                 RefreshToken = refreshToken,
-                User = new UserResponseDTO
+                User = new UserResponseDto
                 {
                     Id = user.Id.ToString(),
                     Name = user.Name,
@@ -186,111 +186,6 @@ namespace RealEstateAPI.Controllers
             return Ok(LoginResponseDTO);
            
         }
-
-        /*
-        [HttpPost("register")]
-        public async Task<ActionResult<Models.User>> Register([FromForm] UserAddDTO dTO)
-        {
-
-            try
-            {
-
-                var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == dTO.Email || u.Username == dTO.Username);
-
-                if (existingUser != null)
-                {
-                    return BadRequest("A user with the same email or username already exists.");
-                }
-
-                if (dTO.Password != dTO.RepeatPassword)
-                {
-                    return BadRequest("Passwords do not match.");
-                }
-
-
-                bool HasRoles = await _context.Roles.AnyAsync();
-
-
-                if (!HasRoles)
-                {
-
-                    Role role = new Role
-                    {
-                        Name = "User",
-                        Description = "Default role for new users",
-                        Level = 1
-                    };
-
-                    _context.Roles.Add(role);
-                    _context.SaveChanges();
-                }
-
-                var Role = await _context.Roles.FirstOrDefaultAsync(r => r.Level == 1);
-
-
-                if (Role == null)
-                {
-                    _logger.LogError("Default role not found in the database.");
-                    return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing your request: Default Role");
-                }
-
-
-
-
-
-
-                Models.User user = new Models.User
-                {
-                    Name = dTO.Name,
-                    Email = dTO.Email,
-                    Username = dTO.Username,
-                    Password = BCrypt.Net.BCrypt.HashPassword(dTO.Password, 10),
-                    Role = Role
-                };
-
-                if (dTO.Image != null && dTO.Image.Length > 0)
-                {
-                    // Obtener extensión del archivo original
-                    var extension = Path.GetExtension(dTO.Image.FileName);
-
-                    // Generar un nombre único usando GUID
-                    var randomFileName = $"{Guid.NewGuid()}{extension}";
-
-                    // Ruta final
-                    var filePath = Path.Combine(
-                        Directory.GetCurrentDirectory(),
-                        "wwwroot",
-                        "images",
-                        "users",
-                        randomFileName
-                    );
-
-                    // Guardar el archivo
-                    using (var stream = new FileStream(filePath, FileMode.Create))
-                    {
-                        await dTO.Image.CopyToAsync(stream);
-                    }
-
-                    // Guardar el nombre en la base de datos
-                    user.Image = randomFileName;
-                }
-
-                _context.Users.Add(user);
-                _context.SaveChanges();
-
-
-                return Ok(user);
-
-
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error occurred while registering user.");
-                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing your request: " + ex.Message);
-
-            }
-        }
-        */
 
         [HttpPost("find-user")]
         public async Task<ActionResult<bool>> FindUser([FromBody] FindUserDTO dTO)
@@ -401,7 +296,7 @@ namespace RealEstateAPI.Controllers
         }
 
         [HttpPost("passkey/register/verify")]
-        public async Task<ActionResult<LoginResponseDTO>> RegisterPasskeyVerify([FromBody] AuthenticatorAttestationRawResponse credential)
+        public async Task<ActionResult<LoginResponseDto>> RegisterPasskeyVerify([FromBody] AuthenticatorAttestationRawResponse credential)
         {
             var jsonOptions = HttpContext.Session.GetString("fido.attestationOptions");
             var options = CredentialCreateOptions.FromJson(jsonOptions);
@@ -526,11 +421,11 @@ namespace RealEstateAPI.Controllers
             AppendTokenCookie(accessToken, 15);
             AppendRefreshTokenCookie(refreshToken, 7);
 
-            var LoginResponseDTO = new LoginResponseDTO
+            var LoginResponseDTO = new LoginResponseDto
             {
                 AccessToken = accessToken,
                 RefreshToken = refreshToken,
-                User = new UserResponseDTO
+                User = new UserResponseDto
                 {
                     Id = user.Id.ToString(),
                     Name = user.Name,
@@ -604,7 +499,7 @@ namespace RealEstateAPI.Controllers
         }
 
         [HttpPost("passkey/login/device/verify")]
-        public async Task<ActionResult<LoginResponseDTO>> LoginDevicePasskeyVerify([FromBody] JsonElement body)
+        public async Task<ActionResult<LoginResponseDto>> LoginDevicePasskeyVerify([FromBody] JsonElement body)
         {
             var rawJson = body.GetRawText();
 
@@ -680,11 +575,11 @@ namespace RealEstateAPI.Controllers
             AppendTokenCookie(accessToken, 15);
             AppendRefreshTokenCookie(refreshToken, 7);
 
-            var LoginResponseDTO = new LoginResponseDTO
+            var LoginResponseDTO = new LoginResponseDto
             {
                 AccessToken = accessToken,
                 RefreshToken = refreshToken,
-                User = new UserResponseDTO
+                User = new UserResponseDto
                 {
                     Id = user.Id.ToString(),
                     Name = user.Name,

@@ -44,6 +44,25 @@ namespace RealEstateAPI.Security
             return Role.Level >= requiredRoleLevel;
         }
 
+        //
+        public bool HasSuperiorRoleTo(int  userId, int userToId)
+        {
+            var user = _context.Users
+                .Include(u => u.Role)
+                .FirstOrDefault(u => u.Id == userId);
+
+            var userTo = _context.Users
+                .Include(u => u.Role)
+                .FirstOrDefault(u => u.Id == userToId);
+
+            if (user == null) return false;
+            if(userTo == null) return true;
+
+
+            return user.Role.Level >= userTo.Role.Level;
+
+
+        }
 
 
     }
